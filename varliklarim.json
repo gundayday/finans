@@ -1,0 +1,26 @@
+{
+  "hisseler": {
+    "GMSTR.IS": 208.0,
+    "GLDTR.IS": 589.0
+  },
+  "kripto_paralar": {
+    "bitcoin": 0.00496472,
+    "ethereum": 0.67240624,
+    "solana": 2.20408323,
+    "avalanche-2": 20.03588158,
+    "ether-fi": 350.31744622,
+    "arbitrum": 1037.3431576,
+    "zksync": 6046.96139894,
+    "optimism": 241.64807754,
+    "ripple": 33.09197253,
+    "eigenlayer": 146.94213015,
+    "io": 292.33728134,
+    "binancecoin": 0.00278409
+  },
+  "nakit_ve_emtia": {
+    "gram_altin": 3.0,
+    "dolar": 3674.0,
+    "euro": 2000.0,
+    "sterlin": 0.0
+  }
+}

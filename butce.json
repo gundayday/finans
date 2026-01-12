@@ -1,0 +1,24 @@
+{
+  "gelirler": {
+    "Maa\u015f": 180000.0,
+    "Ev Kira \u0130zmir": 13500.0
+  },
+  "giderler": {
+    "Kredi Kartlari": {
+      "Vak\u0131f Kredi Kart\u0131": 88531.09,
+      "Vak\u0131f KMH": 994.98,
+      "Enpara Kredi Kart\u0131": 22081.63,
+      "Enpara KMH": 36780.28,
+      "Garanti Shop Miles Kredi Kart\u0131": 70979.47
+    },
+    "Diger Borclar": {
+      "B\u00f6l\u00fck Aidat": 0.0,
+      "Google AI Gemini": 0.0
+    },
+    "Sabit Giderler": {
+      "Vak\u0131f Kredi (15.05.26)": 2118.49,
+      "Ziraat Ev Kredi (17.11.2027)": 2055.34,
+      "Garanti Ev Kredi (15.08.2030)": 62266.96
+    }
+  }
+}
