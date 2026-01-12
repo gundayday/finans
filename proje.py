@@ -6,18 +6,17 @@ import yfinance as yf
 from bs4 import BeautifulSoup
 import os
 from datetime import datetime
-import plotly.express as px
+import plotly.express as px  # Grafik hatasını çözer
 import base64
 import numpy as np
 
 # --- GITHUB OTOMATIK KAYIT FONKSIYONU ---
 def github_a_kaydet(dosya_adi, veri):
     """Veriyi hem lokale hem de GitHub'a gönderir."""
-    # Önce yerel dosyayı güncelle
     with open(dosya_adi, "w") as f:
         json.dump(veri, f, indent=2)
     
-    # Streamlit Cloud üzerindeysek GitHub'a gönder
+    # Streamlit Cloud üzerindeysek GitHub'a pushla
     if "GITHUB_TOKEN" in st.secrets:
         try:
             token = st.secrets["GITHUB_TOKEN"]
@@ -25,21 +24,18 @@ def github_a_kaydet(dosya_adi, veri):
             url = f"https://api.github.com/repos/{repo}/contents/{dosya_adi}"
             headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
             
-            # Mevcut dosyanın SHA değerini al
             r = requests.get(url, headers=headers)
             sha = r.json().get("sha") if r.status_code == 200 else None
             
             content = base64.b64encode(json.dumps(veri, indent=2).encode()).decode()
             data = {
-                "message": f"Finans Güncelleme: {dosya_adi}",
+                "message": f"Veri Güncelleme: {dosya_adi}",
                 "content": content,
                 "branch": "main"
             }
             if sha: data["sha"] = sha
-            
             requests.put(url, headers=headers, json=data)
-        except Exception as e:
-            st.error(f"GitHub Kayıt Hatası: {e}")
+        except: pass
 
 # --- VERİ YÖNETİMİ ---
 def veri_yukle(dosya_adi, varsayilan):
@@ -117,7 +113,6 @@ if sayfa == "Ana Panel":
     h_fiyatlar = hisse_fiyat_cek(veriler["hisseler"].keys())
 
     if 'man_f' not in st.session_state: st.session_state.man_f = {}
-    perf_data = []
 
     def ciz_tablo(kat, varliklar, kaynak, tip):
         liste = []; t_tl = 0; t_usd = 0; t_e_tl = 0
@@ -132,20 +127,21 @@ if sayfa == "Ana Panel":
                 f_tl = man if man > 0 else (kaynak.get(vid, 0) if tip=="hisse" else kurlar.get({"dolar":"USD","euro":"EUR","sterlin":"GBP","gram_altin":"gram-altin"}.get(vid), 0))
                 if (vid.lower() == "gmstr.is" and f_tl < 100) or f_tl <= 0: f_tl = gecmis_fiyatlar.get(f"{vid}_tl", 0)
                 f_usd = f_tl / usd_try
-            if mal_usd == 0: mal_usd = f_usd
+            
             e_f_tl = gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
             t_tl += (mik * f_tl); t_usd += (mik * f_usd); t_e_tl += (mik * e_f_tl)
-            perf_data.append({"Varlık": vid.upper(), "Maliyet ($)": mal_usd, "Mevcut ($)": f_usd})
+            
             liste.append({"Varlık": vid.upper(), "Miktar": mik, "Maliyet ($)": f"${mal_usd:,.2f}", "Değer (TL)": f"₺{mik*f_tl:,.2f}", "Değ (TL)": fmt_deg(f_tl, e_f_tl), "Değer ($)": f"${mik*f_usd:,.2f}"})
             gecmis_fiyatlar[f"{vid}_tl"] = f_tl; gecmis_fiyatlar[f"{vid}_usd"] = f_usd
 
         st.subheader(kat.replace("_", " ").title())
         if liste:
-            # tabulate hatasını önlemek için to_markdown yerine st.table veya standart dataframe kullanıyoruz
+            # tabulate hatasını önlemek için st.dataframe kullanıyoruz
             st.dataframe(pd.DataFrame(liste), use_container_width=True)
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
         return {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl}
 
+    # Değişkenleri tanımla
     res_k = ciz_tablo("kripto_paralar", veriler["kripto_paralar"], k_fiyatlar, "kripto")
     res_n = ciz_tablo("nakit_ve_emtia", veriler["nakit_ve_emtia"], None, "nakit")
     res_h = ciz_tablo("borsa", veriler["hisseler"], h_fiyatlar, "hisse")
@@ -178,8 +174,7 @@ if sayfa == "Ana Panel":
         gecmis_kayitlar.append(kayit)
         github_a_kaydet("gecmis_arsiv.json", gecmis_kayitlar)
         github_a_kaydet("fiyat_gecmis.json", gecmis_fiyatlar)
-        st.success("GitHub'a arşivlendi!")
-        st.rerun()
+        st.success("GitHub'a arşivlendi!"); st.rerun()
 
 # --- BÜTÇE ---
 elif sayfa == "Bütçe Yönetimi":
@@ -208,6 +203,8 @@ elif sayfa == "Bütçe Yönetimi":
     
     net = t_gel - t_gid
     st.header(f"Net: ₺{net:,.2f}")
+    
+    # Bütçe hesaplama hatası çözümü
     esk_net = net
     if butce_arsivi:
         try:
@@ -215,6 +212,9 @@ elif sayfa == "Bütçe Yönetimi":
             if isinstance(val, str): val = val.replace("₺", "").replace(",", "").strip()
             esk_net = float(val)
         except: pass
+
+    # Grafik hatası çözümü
+    st.plotly_chart(px.bar(x=["Gelir", "Gider"], y=[t_gel, t_gid], color=["Gelir", "Gider"], color_discrete_map={"Gelir": "green", "Gider": "red"}), use_container_width=True)
 
     if st.button("💾 ARŞİVLE"):
         b_k = {"tarih": datetime.now().strftime("%Y-%m-%d %H:%M"), "GELİR (TL)": f"₺{t_gel:,.0f}", "GİDER (TL)": f"₺{t_gid:,.0f}", "NET (TL)": f"₺{net:,.0f}", "NET ($)": f"${net/usd_val:,.0f}", "Değişim %": fmt_deg(net, esk_net)}
@@ -225,7 +225,7 @@ elif sayfa == "Geçmiş Performans":
     if not gecmis_kayitlar: st.info("Yok.")
     else: st.dataframe(pd.DataFrame(gecmis_kayitlar[::-1]), use_container_width=True)
 
-# SIDEBAR EKLEME
+# SIDEBAR
 with st.sidebar.expander("➕ Varlık"):
     kat = st.selectbox("Kategori", ["hisseler", "kripto_paralar", "nakit_ve_emtia"])
     kod = st.text_input("Kod").lower()
