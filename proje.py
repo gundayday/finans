@@ -55,7 +55,7 @@ def temizle_sayi(v):
     if v is None or v == "" or str(v).lower() == "nan": return 0.0
     if isinstance(v, (int, float)): return float(v)
     try:
-        return float(str(v).replace("₺","").replace("$","").replace(",","").replace("%","").strip())
+        return float(str(v).replace("₺","").replace("$","").replace(",","").replace("%","").replace(":green[","").replace(":red[","").replace("]","").strip())
     except: return 0.0
 
 def fmt_yuzde(suan, eski):
@@ -172,7 +172,7 @@ if sayfa == "Ana Panel":
         github_a_kaydet("fiyat_gecmis.json", gecmis_fiyatlar)
         st.success("GitHub'a arşivlendi!"); st.rerun()
 
-# --- GEÇMİŞ PERFORMANS ---
+# --- GEÇMİŞ PERFORMANS (Düzeltildi) ---
 elif sayfa == "Geçmiş Performans":
     st.title("📜 Detaylı Portföy Arşivi")
     if not gecmis_kayitlar:
@@ -180,9 +180,13 @@ elif sayfa == "Geçmiş Performans":
     else:
         df_a = pd.DataFrame(gecmis_kayitlar[::-1])
         
-        # Hata Çözümü: Verileri güvenli şekilde sayıya çevir 
-        df_a["Deg_TL_Num"] = df_a["Değişim (TL)"].apply(temizle_sayi)
-        df_a["Deg_USD_Num"] = df_a["Değişim ($)"].apply(temizle_sayi)
+        # 1. İstediğin Düzenleme: Renksiz kolonları temizle ve sadece renkli kolonları sayısal olarak tut
+        if "Değişim (TL)" in df_a.columns: df_a = df_a.drop(columns=["Değişim (TL)"])
+        if "Değişim ($)" in df_a.columns: df_a = df_a.drop(columns=["Değişim ($)"])
+        
+        # Sayısal çevrim yap
+        df_a["Deg_TL_Num"] = df_a["Deg_TL_Num"].apply(temizle_sayi) if "Deg_TL_Num" in df_a.columns else 0.0
+        df_a["Deg_USD_Num"] = df_a["Deg_USD_Num"].apply(temizle_sayi) if "Deg_USD_Num" in df_a.columns else 0.0
         
         # Tabloyu Renkli Göster
         st.dataframe(
@@ -229,23 +233,48 @@ elif sayfa == "Bütçe Yönetimi":
     st.plotly_chart(px.bar(x=["Gelir", "Gider"], y=[t_gel, t_gid], color=["Gelir", "Gider"], color_discrete_map={"Gelir": "green", "Gider": "red"}), use_container_width=True)
 
     if st.button("💾 ARŞİVLE"):
-        b_k = {"tarih": datetime.now().strftime("%Y-%m-%d %H:%M"), "GELİR (TL)": f"₺{t_gel:,.0f}", "GİDER (TL)": f"₺{t_gid:,.0f}", "NET (TL)": f"₺{net:,.0f}", "NET ($)": f"${net/usd_val:,.0f}", "Değişim %": f"{fmt_yuzde(net, esk_net):+.2f}%"}
+        # Kaydederken sadece sayısal değeri saklıyoruz ki okurken :green/red sorunu çıkmasın
+        b_k = {
+            "tarih": datetime.now().strftime("%Y-%m-%d %H:%M"), 
+            "GELİR (TL)": f"₺{t_gel:,.0f}", 
+            "GİDER (TL)": f"₺{t_gid:,.0f}", 
+            "NET (TL)": f"₺{net:,.0f}", 
+            "NET ($)": f"${net/usd_val:,.0f}", 
+            "Değişim_Num": fmt_yuzde(net, esk_net) # Değişim% yerine sayısal tutuyoruz
+        }
         butce_arsivi.append(b_k); github_a_kaydet("butce_arsiv.json", butce_arsivi); st.success("Arşivlendi!"); st.rerun()
 
+# --- BÜTÇE ARŞİVİ (Düzeltildi) ---
 elif sayfa == "Bütçe Arşivi":
     st.title("📜 Bütçe Arşivi")
-    if not butce_arsivi: st.info("Yok.")
-    else: st.dataframe(pd.DataFrame(butce_arsivi[::-1]), use_container_width=True)
+    if not butce_arsivi:
+        st.info("Yok.")
+    else:
+        df_b = pd.DataFrame(butce_arsivi[::-1])
+        
+        # 2. İstediğin Düzenleme: Bütçe arşivini renklendir
+        if "Değişim %" in df_b.columns: df_b = df_b.drop(columns=["Değişim %"])
+        
+        # Sayısal çevrim yap
+        if "Değişim_Num" in df_b.columns:
+            df_b["Değişim_Num"] = df_b["Değişim_Num"].apply(temizle_sayi)
+            st.dataframe(
+                df_b.style.applymap(renk_stili, subset=["Değişim_Num"])
+                .format({"Değişim_Num": "{:+.2f}%"}), 
+                use_container_width=True
+            )
+        else:
+            st.dataframe(df_b, use_container_width=True)
 
 # SIDEBAR VARLIK EKLEME
 with st.sidebar.expander("➕ Varlık & Akıllı Maliyet"):
-    k = st.selectbox("Kategori", ["hisseler", "kripto_paralar", "nakit_ve_emtia"])
-    c = st.text_input("Kod").lower()
+    kat = st.selectbox("Kategori", ["hisseler", "kripto_paralar", "nakit_ve_emtia"])
+    kod = st.text_input("Kod").lower()
     m = st.number_input("Miktar", value=0.0, format="%.8f")
     f = st.number_input("Alım Fiyatı ($)", value=0.0, format="%.4f")
     if st.button("Kaydet"):
-        old = veriler[k].get(c, {"miktar": 0, "maliyet_usd": 0})
+        old = veriler[kat].get(kod, {"miktar": 0, "maliyet_usd": 0})
         old_m = old["miktar"]; old_c = old["maliyet_usd"]
         new_c = ((old_m * old_c) + ((m - old_m) * f)) / m if m > old_m and f > 0 else (f if old_c == 0 else old_c)
-        veriler[k][c] = {"miktar": m, "maliyet_usd": new_c}
+        veriler[kat][kod] = {"miktar": m, "maliyet_usd": new_c}
         github_a_kaydet("varliklarim.json", veriler); st.rerun()
