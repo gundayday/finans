@@ -193,34 +193,35 @@ if sayfa == "Ana Panel":
     c2.metric("GENEL TOPLAM ($)", f"${g_usd:,.2f}", f"{fmt_yuzde(g_usd, e_usd):+.2f}%")
     c3.metric("Dolar Kuru", f"₺{usd_try}")
 
-    # --- ADIM 1 (DÜZELTME): RİSK VE DAĞILIM ANALİZİ ---
+    # --- ADIM 1 (GARANTİ ÇÖZÜM): RİSK VE DAĞILIM ANALİZİ ---
     st.markdown("### ⚖️ Portföy Risk ve Dağılım Analizi")
     
-    # Harf duyarlılığını ortadan kaldırmak için tüm hisse anahtarlarını küçük harfe çevirerek kontrol edelim
-    hisse_sozlugu_kucuk = {k.lower(): v for k, v in veriler["hisseler"].items()}
-    
+    # 1. Adım: Hisseler içindeki Altın ve Gümüşü bulalım (Büyük/Küçük harf fark etmeksizin)
     gumus_deger_tl = 0
     altin_deger_tl = 0
     
-    # Gümüş Kontrolü
-    if "gmstr.is" in hisse_sozlugu_kucuk:
-        miktar = hisse_sozlugu_kucuk["gmstr.is"]["miktar"]
-        fiyat = gecmis_fiyatlar.get("gmstr.is_tl", 0)
-        gumus_deger_tl = miktar * fiyat
+    for sembol, data in veriler["hisseler"].items():
+        s_upper = sembol.upper()
+        miktar = data["miktar"]
+        # Fiyatı gecmis_fiyatlar'dan alırken ana panelde kaydedilen formatta alıyoruz
+        fiyat = gecmis_fiyatlar.get(f"{sembol}_tl", 0)
         
-    # Altın Kontrolü
-    if "gldtr.is" in hisse_sozlugu_kucuk:
-        miktar = hisse_sozlugu_kucuk["gldtr.is"]["miktar"]
-        fiyat = gecmis_fiyatlar.get("gldtr.is_tl", 0)
-        altin_deger_tl = miktar * fiyat
+        if "GMSTR" in s_upper:
+            gumus_deger_tl = miktar * fiyat
+        elif "GLDTR" in s_upper:
+            altin_deger_tl = miktar * fiyat
 
-    # Hesaplama Mantığı:
-    # Toplam hisse değerinden altın ve gümüşü ÇIKAR, onları güvenli limana EKLE.
+    # 2. Adım: res_h["tl"] zaten tüm hisselerin toplamı. 
+    # Riskli hisseleri bulmak için toplamdan altın/gümüşü düşüyoruz.
     riskli_hisse_degeri = max(0, res_h["tl"] - (gumus_deger_tl + altin_deger_tl))
+    
+    # 3. Adım: Güvenli liman = Nakitler + Çıkardığımız Altın/Gümüş
     guvenli_liman_degeri = res_n["tl"] + gumus_deger_tl + altin_deger_tl
+    
+    # 4. Adım: Kripto zaten belli
     yuksek_risk_kripto_degeri = res_k["tl"]
     
-    toplam_servet = (riskli_hisse_degeri + guvenli_liman_degeri + yuksek_risk_kripto_degeri)
+    toplam_servet = riskli_hisse_degeri + guvenli_liman_degeri + yuksek_risk_kripto_degeri
     if toplam_servet <= 0: toplam_servet = 1
 
     m_oranlar = {
