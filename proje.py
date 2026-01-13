@@ -213,6 +213,8 @@ if sayfa == "Ana Panel":
             mik = data["miktar"]
             mal_usd = data["maliyet_usd"]
             man = st.session_state.man_f.get(f"m_{kat}_{vid}", 0)
+            
+            # Fiyat Belirleme Mantığı
             if tip == "kripto":
                 f_usd = man if man > 0 else kaynak.get(vid, {}).get("usd", 0)
                 if f_usd <= 0:
@@ -220,46 +222,34 @@ if sayfa == "Ana Panel":
                 f_tl = f_usd * usd_try
             else:
                 f_tl = (
-                    man
-                    if man > 0
-                    else (
-                        kaynak.get(vid, 0)
-                        if tip == "hisse"
-                        else kurlar.get(
-                            {
-                                "dolar": "USD",
-                                "euro": "EUR",
-                                "sterlin": "GBP",
-                                "gram_altin": "gram-altin",
-                            }.get(vid),
-                            0,
-                        )
+                    man if man > 0 else (
+                        kaynak.get(vid, 0) if tip == "hisse"
+                        else kurlar.get({"dolar": "USD", "euro": "EUR", "sterlin": "GBP", "gram_altin": "gram-altin"}.get(vid), 0)
                     )
                 )
                 if (vid.lower() == "gmstr.is" and f_tl < 100) or f_tl <= 0:
                     f_tl = gecmis_fiyatlar.get(f"{vid}_tl", 0)
                 f_usd = f_tl / usd_try
 
-            if mal_usd == 0:
-                mal_usd = f_usd
-            e_f_tl = gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
-            e_f_usd = gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
+            # Kar/Zarar Hesaplama
+            kz_yuzde = ((f_usd - mal_usd) / mal_usd * 100) if mal_usd > 0 else 0
+            
             t_tl += mik * f_tl
             t_usd += mik * f_usd
-            t_e_tl += mik * e_f_tl
-            t_e_usd += mik * e_f_usd
+            t_e_tl += mik * gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
+            t_e_usd += mik * gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
 
-            liste.append(
-                {
-                    "Varlık": vid.upper(),
-                    "Miktar": mik,
-                    "Maliyet ($)": mal_usd,
-                    "Değer (TL)": mik * f_tl,
-                    "Değ% (TL)": fmt_yuzde(f_tl, e_f_tl),
-                    "Değer ($)": mik * f_usd,
-                    "Değ% ($)": fmt_yuzde(f_usd, e_f_usd),
-                }
-            )
+            liste.append({
+                "Varlık": vid.upper(),
+                "Miktar": mik,
+                "Maliyet ($)": mal_usd,
+                "Birim Fiyat ($)": f_usd,
+                "K/Z %": kz_yuzde,
+                "Değer (TL)": mik * f_tl,
+                "Değ% (TL)": fmt_yuzde(f_tl, gecmis_fiyatlar.get(f"{vid}_tl", f_tl)),
+                "Değer ($)": mik * f_usd,
+                "Değ% ($)": fmt_yuzde(f_usd, gecmis_fiyatlar.get(f"{vid}_usd", f_usd)),
+            })
             gecmis_fiyatlar[f"{vid}_tl"] = f_tl
             gecmis_fiyatlar[f"{vid}_usd"] = f_usd
 
@@ -267,15 +257,15 @@ if sayfa == "Ana Panel":
         if liste:
             df = pd.DataFrame(liste)
             st.dataframe(
-                df.style.format(
-                    {
-                        "Maliyet ($)": "${:,.2f}",
-                        "Değer (TL)": "₺{:,.2f}",
-                        "Değer ($)": "${:,.2f}",
-                        "Değ% (TL)": "{:+.2f}%",
-                        "Değ% ($)": "{:+.2f}%",
-                    }
-                ).applymap(renk_stili, subset=["Değ% (TL)", "Değ% ($)"]),
+                df.style.format({
+                    "Maliyet ($)": "${:,.2f}",
+                    "Birim Fiyat ($)": "${:,.2f}",
+                    "K/Z %": "{:+.2f}%",
+                    "Değer (TL)": "₺{:,.2f}",
+                    "Değer ($)": "${:,.2f}",
+                    "Değ% (TL)": "{:+.2f}%",
+                    "Değ% ($)": "{:+.2f}%",
+                }).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]),
                 use_container_width=True,
             )
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
