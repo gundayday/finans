@@ -408,20 +408,33 @@ elif sayfa == "Bütçe Arşivi":
         st.dataframe(pd.DataFrame(butce_arsivi[::-1]), use_container_width=True)
 
 # SIDEBAR VARLIK EKLEME
-with st.sidebar.expander("➕ Varlık & Akıllı Maliyet"):
+with st.sidebar.expander("➕ Varlık Yönetimi & Maliyet"):
     k = st.selectbox("Kategori", ["hisseler", "kripto_paralar", "nakit_ve_emtia"])
-    c = st.text_input("Kod").lower()
-    m = st.number_input("Miktar", value=0.0, format="%.8f")
-    f = st.number_input("Alım Fiyatı ($)", value=0.0, format="%.4f")
-    if st.button("Kaydet"):
-        old = veriler[k].get(c, {"miktar": 0, "maliyet_usd": 0})
-        old_m = old["miktar"]
-        old_c = old["maliyet_usd"]
-        new_c = (
-            ((old_m * old_c) + ((m - old_m) * f)) / m
-            if m > old_m and f > 0
-            else (f if old_c == 0 else old_c)
-        )
-        veriler[k][c] = {"miktar": m, "maliyet_usd": new_c}
-        github_a_kaydet("varliklarim.json", veriler)
-        st.rerun()
+    c = st.text_input("Kod (Örn: btc, thyao.is)").lower().strip()
+    m = st.number_input("Yeni Toplam Miktar", value=0.0, format="%.8f")
+    f = st.number_input("Son Alım Fiyatı ($)", value=0.0, format="%.4f")
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Kaydet/Güncelle"):
+        if c:
+            old = veriler[k].get(c, {"miktar": 0, "maliyet_usd": 0})
+            old_m = old["miktar"]
+            old_c = old["maliyet_usd"]
+            # Akıllı maliyet hesabı (Miktar arttıysa maliyet güncelle)
+            if m > old_m and f > 0:
+                eklenen_miktar = m - old_m
+                new_c = ((old_m * old_c) + (eklenen_miktar * f)) / m
+            else:
+                new_c = old_c if f == 0 else f
+            
+            veriler[k][c] = {"miktar": m, "maliyet_usd": new_c}
+            github_a_kaydet("varliklarim.json", veriler)
+            st.success(f"{c} güncellendi.")
+            st.rerun()
+            
+    if col2.button("Varlığı Sil"):
+        if c in veriler[k]:
+            del veriler[k][c]
+            github_a_kaydet("varliklarim.json", veriler)
+            st.warning(f"{c} silindi.")
+            st.rerun()
