@@ -10,7 +10,7 @@ import plotly.express as px
 import base64
 import numpy as np
 
-# --- GITHUB OTOMATIK KAYIT FONKSIYONU ---
+# --- GITHUB OTOMATIK KAYDET FONKSIYONU ---
 def github_a_kaydet(dosya_adi, veri):
     with open(dosya_adi, "w") as f:
         json.dump(veri, f, indent=2)
@@ -50,7 +50,7 @@ gecmis_kayitlar = veri_yukle("gecmis_arsiv.json", [])
 butce_verisi = veri_yukle("butce.json", {"gelirler": {}, "giderler": {"Kredi Kartlari": {}, "Diger Borclar": {}, "Sabit Giderler": {}}})
 butce_arsivi = veri_yukle("butce_arsiv.json", [])
 
-# --- YARDIMCI FONKSİYONLAR ---
+# --- YARDIMCI FONKSİYONLAR (HATA KORUMALI) ---
 def temizle_sayi(v):
     if v is None or v == "" or str(v).lower() == "nan": return 0.0
     if isinstance(v, (int, float)): return float(v)
@@ -66,9 +66,9 @@ def fmt_yuzde(suan, eski):
     return ((s - e) / e) * 100
 
 def renk_stili(val):
-    if isinstance(val, (int, float)):
-        if val < -0.01: return 'color: #ff4b4b' # Kırmızı
-        if val > 0.01: return 'color: #00cc96' # Yeşil
+    v = temizle_sayi(val)
+    if v < -0.01: return 'color: #ff4b4b' # Kırmızı
+    if v > 0.01: return 'color: #00cc96' # Yeşil
     return ''
 
 def doviz_cek():
@@ -139,10 +139,7 @@ if sayfa == "Ana Panel":
         st.subheader(kat.replace("_", " ").title())
         if liste:
             df = pd.DataFrame(liste)
-            st.dataframe(df.style.format({
-                "Maliyet ($)": "${:,.2f}", "Değer (TL)": "₺{:,.2f}", "Değer ($)": "${:,.2f}", 
-                "Değ% (TL)": "{:+.2f}%", "Değ% ($)": "{:+.2f}%"
-            }).applymap(renk_stili, subset=["Değ% (TL)", "Değ% ($)"]), use_container_width=True)
+            st.dataframe(df.style.applymap(renk_stili, subset=["Değ% (TL)", "Değ% ($)"]), use_container_width=True)
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
         return {"tl": t_tl, "usd": t_usd}
 
@@ -152,8 +149,6 @@ if sayfa == "Ana Panel":
 
     g_tl = res_k['tl'] + res_n['tl'] + res_h['tl']
     g_usd = res_k['usd'] + res_n['usd'] + res_h['usd']
-    
-    # Bir önceki Genel Toplamları bul
     e_tl = temizle_sayi(gecmis_kayitlar[-1].get("Toplam (TL)", g_tl)) if gecmis_kayitlar else g_tl
     e_usd = temizle_sayi(gecmis_kayitlar[-1].get("Toplam ($)", g_usd)) if gecmis_kayitlar else g_usd
 
@@ -174,7 +169,7 @@ if sayfa == "Ana Panel":
         gecmis_kayitlar.append(kayit)
         github_a_kaydet("gecmis_arsiv.json", gecmis_kayitlar)
         github_a_kaydet("fiyat_gecmis.json", gecmis_fiyatlar)
-        st.success("Arşivlendi!"); st.rerun()
+        st.success("GitHub'a arşivlendi!"); st.rerun()
 
 # --- GEÇMİŞ PERFORMANS ---
 elif sayfa == "Geçmiş Performans":
@@ -183,20 +178,18 @@ elif sayfa == "Geçmiş Performans":
         st.info("Henüz kayıt bulunmuyor.")
     else:
         df_a = pd.DataFrame(gecmis_kayitlar[::-1])
-        # Temizlik
+        # Tablodan eski metin tabanlı değişim sütunlarını temizle
         cols_to_drop = ["Değişim (TL)", "Değişim ($)", "Değ% (TL)", "Değ% ($)"]
         df_a = df_a.drop(columns=[c for c in cols_to_drop if c in df_a.columns])
         
-        # Sayısal Formatlama
-        if "Deg_TL_Num" in df_a.columns: df_a["Deg_TL_Num"] = df_a["Deg_TL_Num"].apply(temizle_sayi)
-        if "Deg_USD_Num" in df_a.columns: df_a["Deg_USD_Num"] = df_a["Deg_USD_Num"].apply(temizle_sayi)
+        # Sayısal değerleri garantiye al
+        for col in ["Deg_TL_Num", "Deg_USD_Num"]:
+            if col in df_a.columns:
+                df_a[col] = df_a[col].apply(temizle_sayi)
         
+        # Hata Çözümü: Formatlama işlemini daha güvenli yapıyoruz
         st.dataframe(
-            df_a.style.format({
-                "Kripto (TL)": "₺{:,.0f}", "Nakit (TL)": "₺{:,.0f}", "Borsa (TL)": "₺{:,.0f}", "Toplam (TL)": "₺{:,.0f}",
-                "Kripto ($)": "${:,.0f}", "Nakit ($)": "${:,.0f}", "Borsa ($)": "${:,.0f}", "Toplam ($)": "${:,.0f}",
-                "Deg_TL_Num": "{:+.2f}%", "Deg_USD_Num": "{:+.2f}%"
-            }).applymap(renk_stili, subset=["Deg_TL_Num", "Deg_USD_Num"]), 
+            df_a.style.applymap(renk_stili, subset=[c for c in ["Deg_TL_Num", "Deg_USD_Num"] if c in df_a.columns]),
             use_container_width=True
         )
 
@@ -227,7 +220,6 @@ elif sayfa == "Bütçe Yönetimi":
     
     net = t_gel - t_gid
     st.header(f"Net Bütçe: ₺{net:,.2f}")
-    
     e_net = temizle_sayi(butce_arsivi[-1].get("NET (TL)", net)) if butce_arsivi else net
 
     if st.button("💾 ARŞİVLE"):
@@ -248,10 +240,7 @@ elif sayfa == "Bütçe Arşivi":
         if "Değişim_Num" in df_b.columns: df_b["Değişim_Num"] = df_b["Değişim_Num"].apply(temizle_sayi)
         
         st.dataframe(
-            df_b.style.format({
-                "GELİR (TL)": "₺{:,.0f}", "GİDER (TL)": "₺{:,.0f}", "NET (TL)": "₺{:,.0f}",
-                "NET ($)": "${:,.0f}", "Değişim_Num": "{:+.2f}%"
-            }).applymap(renk_stili, subset=["Değişim_Num"] if "Değişim_Num" in df_b.columns else []), 
+            df_b.style.applymap(renk_stili, subset=["Değişim_Num"] if "Değişim_Num" in df_b.columns else []), 
             use_container_width=True
         )
 
