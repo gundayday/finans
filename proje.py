@@ -193,34 +193,55 @@ if sayfa == "Ana Panel":
     c2.metric("GENEL TOPLAM ($)", f"${g_usd:,.2f}", f"{fmt_yuzde(g_usd, e_usd):+.2f}%")
     c3.metric("Dolar Kuru", f"₺{usd_try}")
 
-    # --- ADIM 1: RİSK VE DAĞILIM ANALİZİ (YENİ MODÜL) ---
+    # --- ADIM 1 (DÜZELTME): RİSK VE DAĞILIM ANALİZİ ---
     st.markdown("### ⚖️ Portföy Risk ve Dağılım Analizi")
     
-    # Altın ve Gümüş ETF'lerini hisseden ayırıp 'Güvenli Liman'a ekleyelim
+    # Harf duyarlılığını ortadan kaldırmak için tüm hisse anahtarlarını küçük harfe çevirerek kontrol edelim
+    hisse_sozlugu_kucuk = {k.lower(): v for k, v in veriler["hisseler"].items()}
+    
     gumus_deger_tl = 0
     altin_deger_tl = 0
-    if "gmstr.is" in veriler["hisseler"]:
-        gumus_deger_tl = gecmis_fiyatlar.get("gmstr.is_tl", 0) * veriler["hisseler"]["gmstr.is"]["miktar"]
-    if "gldtr.is" in veriler["hisseler"]:
-        altin_deger_tl = gecmis_fiyatlar.get("gldtr.is_tl", 0) * veriler["hisseler"]["gldtr.is"]["miktar"]
+    
+    # Gümüş Kontrolü
+    if "gmstr.is" in hisse_sozlugu_kucuk:
+        miktar = hisse_sozlugu_kucuk["gmstr.is"]["miktar"]
+        fiyat = gecmis_fiyatlar.get("gmstr.is_tl", 0)
+        gumus_deger_tl = miktar * fiyat
+        
+    # Altın Kontrolü
+    if "gldtr.is" in hisse_sozlugu_kucuk:
+        miktar = hisse_sozlugu_kucuk["gldtr.is"]["miktar"]
+        fiyat = gecmis_fiyatlar.get("gldtr.is_tl", 0)
+        altin_deger_tl = miktar * fiyat
 
-    riskli_hisse = max(0, res_h["tl"] - (gumus_deger_tl + altin_deger_tl))
-    guvenli_liman = res_n["tl"] + gumus_deger_tl + altin_deger_tl
-    yuksek_risk_kripto = res_k["tl"]
-    toplam_servet = g_tl if g_tl > 0 else 1
+    # Hesaplama Mantığı:
+    # Toplam hisse değerinden altın ve gümüşü ÇIKAR, onları güvenli limana EKLE.
+    riskli_hisse_degeri = max(0, res_h["tl"] - (gumus_deger_tl + altin_deger_tl))
+    guvenli_liman_degeri = res_n["tl"] + gumus_deger_tl + altin_deger_tl
+    yuksek_risk_kripto_degeri = res_k["tl"]
+    
+    toplam_servet = (riskli_hisse_degeri + guvenli_liman_degeri + yuksek_risk_kripto_degeri)
+    if toplam_servet <= 0: toplam_servet = 1
 
     m_oranlar = {
-        "Hisse (Şirket Riskli)": (riskli_hisse / toplam_servet) * 100,
-        "Güvenli Liman (Nakit/Altın/Gümüş)": (guvenli_liman / toplam_servet) * 100,
-        "Yüksek Risk (Kripto)": (yuksek_risk_kripto / toplam_servet) * 100
+        "Hisse (Şirket Riskli)": (riskli_hisse_degeri / toplam_servet) * 100,
+        "Güvenli Liman (Altın/Gümüş/Nakit)": (guvenli_liman_degeri / toplam_servet) * 100,
+        "Yüksek Risk (Kripto)": (yuksek_risk_kripto_degeri / toplam_servet) * 100
     }
-    ideal_oranlar = {"Hisse (Şirket Riskli)": 25.0, "Güvenli Liman (Nakit/Altın/Gümüş)": 45.0, "Yüksek Risk (Kripto)": 30.0}
+    
+    ideal_oranlar = {"Hisse (Şirket Riskli)": 25.0, "Güvenli Liman (Altın/Gümüş/Nakit)": 45.0, "Yüksek Risk (Kripto)": 30.0}
 
     analiz_df = []
     for anahtar in m_oranlar.keys():
         fark = m_oranlar[anahtar] - ideal_oranlar[anahtar]
         durum = "✅ Dengeli" if abs(fark) < 5 else ("⚠️ Fazla" if fark > 0 else "📉 Eksik")
-        analiz_df.append({"Varlık Sınıfı": anahtar, "Mevcut Oran": f"%{m_oranlar[anahtar]:.1f}", "İdeal Oran": f"%{ideal_oranlar[anahtar]:.1f}", "Fark": f"{fark:+.1f}%", "Durum": durum})
+        analiz_df.append({
+            "Varlık Sınıfı": anahtar, 
+            "Mevcut Oran": f"%{m_oranlar[anahtar]:.1f}", 
+            "İdeal Oran": f"%{ideal_oranlar[anahtar]:.1f}", 
+            "Fark": f"{fark:+.1f}%", 
+            "Durum": durum
+        })
 
     st.table(pd.DataFrame(analiz_df))
     
