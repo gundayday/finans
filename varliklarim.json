@@ -7,6 +7,10 @@
     "GLDTR.IS": {
       "miktar": 589.0,
       "maliyet_usd": 0.0
+    },
+    "gmstr.is": {
+      "miktar": 0.0,
+      "maliyet_usd": 0
     }
   },
   "kripto_paralar": {
