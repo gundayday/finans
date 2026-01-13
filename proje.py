@@ -286,6 +286,34 @@ if sayfa == "Ana Panel":
     c2.metric("GENEL TOPLAM ($)", f"${g_usd:,.2f}", f"{fmt_yuzde(g_usd, e_usd):+.2f}%")
     c3.metric("Dolar Kuru", f"₺{usd_try}")
 
+    # Toplam Maliyet Hesaplamaları (K/Z analizi için)
+    toplam_maliyet_usd = 0
+    kategoriler = {
+        "Kripto Paralar": veriler["kripto_paralar"],
+        "Nakit ve Emtia": veriler["nakit_ve_emtia"],
+        "Hisseler": veriler["hisseler"]
+    }
+    
+    kat_maliyetler = {}
+    for ad, varlik_listesi in kategoriler.items():
+        m = sum(v["miktar"] * v["maliyet_usd"] for v in varlik_listesi.values())
+        kat_maliyetler[ad] = m
+        toplam_maliyet_usd += m
+
+    st.markdown("### 📈 Maliyet/Değer Performansı (Kâr/Zarar)")
+    
+    m1, m2, m3, m4 = st.columns(4)
+    
+    # Fonksiyon: K/Z Oranı Hesapla ve Yazdır
+    def kz_metrik_yaz(col, baslik, guncel_usd, maliyet_usd):
+        oran = ((guncel_usd - maliyet_usd) / maliyet_usd * 100) if maliyet_usd > 0 else 0
+        col.metric(baslik, f"{oran:+.2f}%", help=f"Toplam Maliyet: ${maliyet_usd:,.2f}")
+
+    kz_metrik_yaz(m1, "Kripto Paralar", res_k["usd"], kat_maliyetler["Kripto Paralar"])
+    kz_metrik_yaz(m2, "Nakit ve Emtia", res_n["usd"], kat_maliyetler["Nakit ve Emtia"])
+    kz_metrik_yaz(m3, "Hisseler", res_h["usd"], kat_maliyetler["Hisseler"])
+    kz_metrik_yaz(m4, "TÜM VARLIKLAR", g_usd, toplam_maliyet_usd)
+    
     if st.button("💰 GÜNÜ KAPAT"):
         kayit = {
             "tarih": datetime.now().strftime("%Y-%m-%d %H:%M"),
