@@ -10,7 +10,7 @@ import plotly.express as px
 import base64
 import numpy as np
 
-# --- GITHUB OTOMATIK KAYDET FONKSIYONU ---
+# --- GITHUB OTOMATIK KAYIT FONKSIYONU ---
 def github_a_kaydet(dosya_adi, veri):
     with open(dosya_adi, "w") as f:
         json.dump(veri, f, indent=2)
@@ -50,7 +50,7 @@ gecmis_kayitlar = veri_yukle("gecmis_arsiv.json", [])
 butce_verisi = veri_yukle("butce.json", {"gelirler": {}, "giderler": {"Kredi Kartlari": {}, "Diger Borclar": {}, "Sabit Giderler": {}}})
 butce_arsivi = veri_yukle("butce_arsiv.json", [])
 
-# --- YARDIMCI FONKSİYONLAR (HATA KORUMALI) ---
+# --- YARDIMCI FONKSİYONLAR ---
 def temizle_sayi(v):
     if v is None or v == "" or str(v).lower() == "nan": return 0.0
     if isinstance(v, (int, float)): return float(v)
@@ -67,8 +67,8 @@ def fmt_yuzde(suan, eski):
 
 def renk_stili(val):
     v = temizle_sayi(val)
-    if v < -0.01: return 'color: #ff4b4b' # Kırmızı
-    if v > 0.01: return 'color: #00cc96' # Yeşil
+    if v < -0.0001: return 'color: #ff4b4b' # Kesin Kırmızı
+    if v > 0.0001: return 'color: #00cc96' # Kesin Yeşil
     return ''
 
 def doviz_cek():
@@ -112,7 +112,7 @@ if sayfa == "Ana Panel":
     if 'man_f' not in st.session_state: st.session_state.man_f = {}
 
     def ciz_tablo(kat, varliklar, kaynak, tip):
-        liste = []; t_tl = 0; t_usd = 0; t_e_tl = 0; t_e_usd = 0
+        liste = []; t_tl = 0; t_usd = 0
         for vid, data in varliklar.items():
             mik = data["miktar"]; mal_usd = data["maliyet_usd"]
             man = st.session_state.man_f.get(f"m_{kat}_{vid}", 0)
@@ -127,7 +127,7 @@ if sayfa == "Ana Panel":
             
             mal_usd = f_usd if mal_usd == 0 else mal_usd
             e_f_tl = gecmis_fiyatlar.get(f"{vid}_tl", f_tl); e_f_usd = gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
-            t_tl += (mik * f_tl); t_usd += (mik * f_usd); t_e_tl += (mik * e_f_tl); t_e_usd += (mik * e_f_usd)
+            t_tl += (mik * f_tl); t_usd += (mik * f_usd)
             
             liste.append({
                 "Varlık": vid.upper(), "Miktar": mik, "Maliyet ($)": mal_usd, 
@@ -149,8 +149,13 @@ if sayfa == "Ana Panel":
 
     g_tl = res_k['tl'] + res_n['tl'] + res_h['tl']
     g_usd = res_k['usd'] + res_n['usd'] + res_h['usd']
-    e_tl = temizle_sayi(gecmis_kayitlar[-1].get("Toplam (TL)", g_tl)) if gecmis_kayitlar else g_tl
-    e_usd = temizle_sayi(gecmis_kayitlar[-1].get("Toplam ($)", g_usd)) if gecmis_kayitlar else g_usd
+    
+    # Eskiyi arşivden oku (Renk hatasını çözen kısım)
+    e_tl = g_tl
+    e_usd = g_usd
+    if gecmis_kayitlar:
+        e_tl = temizle_sayi(gecmis_kayitlar[-1].get("Toplam (TL)", g_tl))
+        e_usd = temizle_sayi(gecmis_kayitlar[-1].get("Toplam ($)", g_usd))
 
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
@@ -178,18 +183,18 @@ elif sayfa == "Geçmiş Performans":
         st.info("Henüz kayıt bulunmuyor.")
     else:
         df_a = pd.DataFrame(gecmis_kayitlar[::-1])
-        # Tablodan eski metin tabanlı değişim sütunlarını temizle
+        # Temizlik
         cols_to_drop = ["Değişim (TL)", "Değişim ($)", "Değ% (TL)", "Değ% ($)"]
         df_a = df_a.drop(columns=[c for c in cols_to_drop if c in df_a.columns])
         
-        # Sayısal değerleri garantiye al
+        # Sayısal Formatlama ve Renklendirme
         for col in ["Deg_TL_Num", "Deg_USD_Num"]:
             if col in df_a.columns:
                 df_a[col] = df_a[col].apply(temizle_sayi)
         
-        # Hata Çözümü: Formatlama işlemini daha güvenli yapıyoruz
         st.dataframe(
-            df_a.style.applymap(renk_stili, subset=[c for c in ["Deg_TL_Num", "Deg_USD_Num"] if c in df_a.columns]),
+            df_a.style.applymap(renk_stili, subset=[c for c in ["Deg_TL_Num", "Deg_USD_Num"] if c in df_a.columns])
+            .format({"Deg_TL_Num": "{:+.2f}%", "Deg_USD_Num": "{:+.2f}%"}), 
             use_container_width=True
         )
 
@@ -206,7 +211,7 @@ elif sayfa == "Bütçe Yönetimi":
         for k, v in butce_verisi["gelirler"].items():
             butce_verisi["gelirler"][k] = st.number_input(f"{k}", value=float(v), key=f"gel_{k}")
         t_gel = sum(butce_verisi['gelirler'].values())
-        st.success(f"Toplam: ₺{t_gel:,.2f}")
+        st.success(f"Top: ₺{t_gel:,.2f}")
     with c2:
         st.subheader("Gider")
         def but_ciz(b, a):
@@ -216,7 +221,7 @@ elif sayfa == "Bütçe Yönetimi":
                 t += butce_verisi["giderler"][a][n]
             return t
         t_gid = but_ciz("Kartlar", "Kredi Kartlari") + but_ciz("Sabit", "Sabit Giderler") + but_ciz("Diğer", "Diger Borclar")
-        st.error(f"Toplam: ₺{t_gid:,.2f}")
+        st.error(f"Top: ₺{t_gid:,.2f}")
     
     net = t_gel - t_gid
     st.header(f"Net Bütçe: ₺{net:,.2f}")
