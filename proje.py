@@ -13,12 +13,13 @@ import numpy as np
 
 # --- GITHUB OTOMATIK KAYIT FONKSIYONU ---
 def github_a_kaydet(dosya_adi, veri):
-    """Veriyi hem lokale hem de GitHub'a gönderir."""
-    with open(dosya_adi, "w") as f:
-        json.dump(veri, f, indent=2)
+    """Veriyi hem lokale hem de GitHub'a gönderir ve hataları raporlar."""
+    try:
+        # 1. Lokale Kaydet
+        with open(dosya_adi, "w") as f:
+            json.dump(veri, f, indent=2)
 
-    if "GITHUB_TOKEN" in st.secrets:
-        try:
+        if "GITHUB_TOKEN" in st.secrets:
             token = st.secrets["GITHUB_TOKEN"]
             repo = st.secrets["GITHUB_REPO"]
             url = f"https://api.github.com/repos/{repo}/contents/{dosya_adi}"
@@ -27,20 +28,29 @@ def github_a_kaydet(dosya_adi, veri):
                 "Accept": "application/vnd.github.v3+json",
             }
 
+            # 2. Mevcut Dosyanın SHA değerini al (Güncelleme için şart)
             r = requests.get(url, headers=headers)
             sha = r.json().get("sha") if r.status_code == 200 else None
 
+            # 3. İçeriği hazırla
             content = base64.b64encode(json.dumps(veri, indent=2).encode()).decode()
             data = {
-                "message": f"Finans Güncelleme: {dosya_adi}",
+                "message": f"Finans Güncelleme: {dosya_adi} - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
                 "content": content,
                 "branch": "main",
             }
             if sha:
                 data["sha"] = sha
-            requests.put(url, headers=headers, json=data)
-        except:
-            pass
+
+            # 4. GitHub'a Gönder
+            put_res = requests.put(url, headers=headers, json=data)
+            
+            if put_res.status_code not in [200, 201]:
+                st.error(f"GitHub Hatası ({dosya_adi}): {put_res.json().get('message')}")
+            else:
+                st.toast(f"GitHub: {dosya_adi} güncellendi! ✅")
+    except Exception as e:
+        st.error(f"Sistem Hatası: {str(e)}")
 
 
 # --- VERİ YÖNETİMİ ---
