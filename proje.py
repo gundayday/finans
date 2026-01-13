@@ -10,7 +10,7 @@ import plotly.express as px
 import base64
 import numpy as np
 
-# --- GITHUB OTOMATIK KAYDET FONKSIYONU ---
+# --- GITHUB OTOMATIK KAYIT FONKSIYONU ---
 def github_a_kaydet(dosya_adi, veri):
     with open(dosya_adi, "w") as f:
         json.dump(veri, f, indent=2)
@@ -55,7 +55,6 @@ def temizle_sayi(v):
     if v is None or v == "" or str(v).lower() == "nan": return 0.0
     if isinstance(v, (int, float)): return float(v)
     try:
-        # Metin içindeki tüm kirli karakterleri temizle
         s = str(v).replace("₺","").replace("$","").replace(",","").replace("%","")
         s = s.replace(":green[","").replace(":red[","").replace("]","").strip()
         return float(s)
@@ -68,8 +67,8 @@ def fmt_yuzde(suan, eski):
 
 def renk_stili(val):
     if isinstance(val, (int, float)):
-        if val < -0.001: return 'color: #ff4b4b' # Kırmızı
-        if val > 0.001: return 'color: #00cc96' # Yeşil
+        if val < -0.01: return 'color: #ff4b4b' # Kırmızı
+        if val > 0.01: return 'color: #00cc96' # Yeşil
     return ''
 
 def doviz_cek():
@@ -126,7 +125,7 @@ if sayfa == "Ana Panel":
                 if (vid.lower() == "gmstr.is" and f_tl < 100) or f_tl <= 0: f_tl = gecmis_fiyatlar.get(f"{vid}_tl", 0)
                 f_usd = f_tl / usd_try
             
-            if mal_usd == 0: mal_usd = f_usd
+            mal_usd = f_usd if mal_usd == 0 else mal_usd
             e_f_tl = gecmis_fiyatlar.get(f"{vid}_tl", f_tl); e_f_usd = gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
             t_tl += (mik * f_tl); t_usd += (mik * f_usd); t_e_tl += (mik * e_f_tl); t_e_usd += (mik * e_f_usd)
             
@@ -145,7 +144,7 @@ if sayfa == "Ana Panel":
                 "Değ% (TL)": "{:+.2f}%", "Değ% ($)": "{:+.2f}%"
             }).applymap(renk_stili, subset=["Değ% (TL)", "Değ% ($)"]), use_container_width=True)
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
-        return {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl, "e_usd": t_e_usd}
+        return {"tl": t_tl, "usd": t_usd}
 
     res_k = ciz_tablo("kripto_paralar", veriler["kripto_paralar"], k_fiyatlar, "kripto")
     res_n = ciz_tablo("nakit_ve_emtia", veriler["nakit_ve_emtia"], None, "nakit")
@@ -153,8 +152,10 @@ if sayfa == "Ana Panel":
 
     g_tl = res_k['tl'] + res_n['tl'] + res_h['tl']
     g_usd = res_k['usd'] + res_n['usd'] + res_h['usd']
-    e_tl = res_k['e_tl'] + res_n['e_tl'] + res_h['e_tl']
-    e_usd = res_k['e_usd'] + res_n['e_usd'] + res_h['e_usd']
+    
+    # Bir önceki Genel Toplamları bul
+    e_tl = temizle_sayi(gecmis_kayitlar[-1].get("Toplam (TL)", g_tl)) if gecmis_kayitlar else g_tl
+    e_usd = temizle_sayi(gecmis_kayitlar[-1].get("Toplam ($)", g_usd)) if gecmis_kayitlar else g_usd
 
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
@@ -163,26 +164,17 @@ if sayfa == "Ana Panel":
     c3.metric("Dolar Kuru", f"₺{usd_try}")
 
     if st.button("💰 GÜNÜ KAPAT"):
-        # Arşivdeki son kaydı bul (Değişim hesaplamak için)
-        son_tl = g_tl
-        son_usd = g_usd
-        if gecmis_kayitlar:
-            try:
-                son_tl = temizle_sayi(gecmis_kayitlar[-1].get("Toplam (TL)", g_tl))
-                son_usd = temizle_sayi(gecmis_kayitlar[-1].get("Toplam ($)", g_usd))
-            except: pass
-
         kayit = {
             "tarih": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "Kripto (TL)": g_k := res_k['tl'], "Nakit (TL)": g_n := res_n['tl'], "Borsa (TL)": g_h := res_h['tl'],
-            "Toplam (TL)": g_tl, "Deg_TL_Num": fmt_yuzde(g_tl, son_tl), # ARTIK SAYI OLARAK KAYDEDİYOR
+            "Kripto (TL)": res_k['tl'], "Nakit (TL)": res_n['tl'], "Borsa (TL)": res_h['tl'],
+            "Toplam (TL)": g_tl, "Deg_TL_Num": fmt_yuzde(g_tl, e_tl),
             "Kripto ($)": res_k['usd'], "Nakit ($)": res_n['usd'], "Borsa ($)": res_h['usd'],
-            "Toplam ($)": g_usd, "Deg_USD_Num": fmt_yuzde(g_usd, son_usd) # ARTIK SAYI OLARAK KAYDEDİYOR
+            "Toplam ($)": g_usd, "Deg_USD_Num": fmt_yuzde(g_usd, e_usd)
         }
         gecmis_kayitlar.append(kayit)
         github_a_kaydet("gecmis_arsiv.json", gecmis_kayitlar)
         github_a_kaydet("fiyat_gecmis.json", gecmis_fiyatlar)
-        st.success("GitHub'a arşivlendi!"); st.rerun()
+        st.success("Arşivlendi!"); st.rerun()
 
 # --- GEÇMİŞ PERFORMANS ---
 elif sayfa == "Geçmiş Performans":
@@ -191,16 +183,14 @@ elif sayfa == "Geçmiş Performans":
         st.info("Henüz kayıt bulunmuyor.")
     else:
         df_a = pd.DataFrame(gecmis_kayitlar[::-1])
-        
-        # Sütun Temizliği: Eski renksiz metin sütunlarını kaldır
-        cols_to_drop = ["Değişim (TL)", "Değişim ($)"]
+        # Temizlik
+        cols_to_drop = ["Değişim (TL)", "Değişim ($)", "Değ% (TL)", "Değ% ($)"]
         df_a = df_a.drop(columns=[c for c in cols_to_drop if c in df_a.columns])
         
-        # Sayısal çevrim yap (Eski metin kayıtları için koruma)
+        # Sayısal Formatlama
         if "Deg_TL_Num" in df_a.columns: df_a["Deg_TL_Num"] = df_a["Deg_TL_Num"].apply(temizle_sayi)
         if "Deg_USD_Num" in df_a.columns: df_a["Deg_USD_Num"] = df_a["Deg_USD_Num"].apply(temizle_sayi)
         
-        # Tabloyu Renkli ve Formatlı Göster
         st.dataframe(
             df_a.style.format({
                 "Kripto (TL)": "₺{:,.0f}", "Nakit (TL)": "₺{:,.0f}", "Borsa (TL)": "₺{:,.0f}", "Toplam (TL)": "₺{:,.0f}",
@@ -210,7 +200,7 @@ elif sayfa == "Geçmiş Performans":
             use_container_width=True
         )
 
-# --- BÜTÇE YÖNETİMİ ---
+# --- BÜTÇE ---
 elif sayfa == "Bütçe Yönetimi":
     st.title("📊 Bütçe")
     usd_val = doviz_cek().get("USD", 43.12)
@@ -223,7 +213,7 @@ elif sayfa == "Bütçe Yönetimi":
         for k, v in butce_verisi["gelirler"].items():
             butce_verisi["gelirler"][k] = st.number_input(f"{k}", value=float(v), key=f"gel_{k}")
         t_gel = sum(butce_verisi['gelirler'].values())
-        st.success(f"Top: ₺{t_gel:,.2f}")
+        st.success(f"Toplam: ₺{t_gel:,.2f}")
     with c2:
         st.subheader("Gider")
         def but_ciz(b, a):
@@ -233,26 +223,18 @@ elif sayfa == "Bütçe Yönetimi":
                 t += butce_verisi["giderler"][a][n]
             return t
         t_gid = but_ciz("Kartlar", "Kredi Kartlari") + but_ciz("Sabit", "Sabit Giderler") + but_ciz("Diğer", "Diger Borclar")
-        st.error(f"Top: ₺{t_gid:,.2f}")
+        st.error(f"Toplam: ₺{t_gid:,.2f}")
     
     net = t_gel - t_gid
-    st.header(f"Net: ₺{net:,.2f}")
+    st.header(f"Net Bütçe: ₺{net:,.2f}")
     
-    esk_net = net
-    if butce_arsivi:
-        try:
-            val = butce_arsivi[-1].get("NET (TL)", net)
-            esk_net = temizle_sayi(val)
-        except: pass
-
-    st.plotly_chart(px.bar(x=["Gelir", "Gider"], y=[t_gel, t_gid], color=["Gelir", "Gider"], color_discrete_map={"Gelir": "green", "Gider": "red"}), use_container_width=True)
+    e_net = temizle_sayi(butce_arsivi[-1].get("NET (TL)", net)) if butce_arsivi else net
 
     if st.button("💾 ARŞİVLE"):
         b_k = {
             "tarih": datetime.now().strftime("%Y-%m-%d %H:%M"), 
             "GELİR (TL)": t_gel, "GİDER (TL)": t_gid, "NET (TL)": net, 
-            "NET ($)": net/usd_val, 
-            "Değişim_Num": fmt_yuzde(net, esk_net) # ARTIK SAYI OLARAK KAYDEDİYOR
+            "NET ($)": net/usd_val, "Değişim_Num": fmt_yuzde(net, e_net)
         }
         butce_arsivi.append(b_k); github_a_kaydet("butce_arsiv.json", butce_arsivi); st.success("Arşivlendi!"); st.rerun()
 
@@ -262,7 +244,6 @@ elif sayfa == "Bütçe Arşivi":
         st.info("Yok.")
     else:
         df_b = pd.DataFrame(butce_arsivi[::-1])
-        # Sütun Temizliği
         if "Değişim %" in df_b.columns: df_b = df_b.drop(columns=["Değişim %"])
         if "Değişim_Num" in df_b.columns: df_b["Değişim_Num"] = df_b["Değişim_Num"].apply(temizle_sayi)
         
@@ -274,7 +255,6 @@ elif sayfa == "Bütçe Arşivi":
             use_container_width=True
         )
 
-# SIDEBAR VARLIK EKLEME
 with st.sidebar.expander("➕ Varlık & Akıllı Maliyet", expanded=True):
     kat = st.selectbox("Kategori", ["hisseler", "kripto_paralar", "nakit_ve_emtia"])
     kod = st.text_input("Kod").lower()
@@ -282,7 +262,6 @@ with st.sidebar.expander("➕ Varlık & Akıllı Maliyet", expanded=True):
     f = st.number_input("Alım Fiyatı ($)", value=0.0, format="%.4f")
     if st.button("Kaydet"):
         old = veriler[kat].get(kod, {"miktar": 0, "maliyet_usd": 0})
-        old_m = old["miktar"]; old_c = old["maliyet_usd"]
-        new_c = ((old_m * old_c) + ((m - old_m) * f)) / m if m > old_m and f > 0 else (f if old_c == 0 else old_c)
+        new_c = ((old["miktar"] * old["maliyet_usd"]) + ((m - old["miktar"]) * f)) / m if m > old["miktar"] and f > 0 else (f if old["maliyet_usd"] == 0 else old["maliyet_usd"])
         veriler[kat][kod] = {"miktar": m, "maliyet_usd": new_c}
         github_a_kaydet("varliklarim.json", veriler); st.rerun()
