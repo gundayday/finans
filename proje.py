@@ -10,28 +10,20 @@ import plotly.express as px
 import base64
 import numpy as np
 
-# --- GITHUB OTOMATIK KAYIT FONKSIYONU ---
+# --- GITHUB OTOMATIK KAYDET FONKSIYONU ---
 def github_a_kaydet(dosya_adi, veri):
-    """Veriyi hem lokale hem de GitHub'a gönderir."""
     with open(dosya_adi, "w") as f:
         json.dump(veri, f, indent=2)
-    
     if "GITHUB_TOKEN" in st.secrets:
         try:
             token = st.secrets["GITHUB_TOKEN"]
             repo = st.secrets["GITHUB_REPO"]
             url = f"https://api.github.com/repos/{repo}/contents/{dosya_adi}"
             headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-            
             r = requests.get(url, headers=headers)
             sha = r.json().get("sha") if r.status_code == 200 else None
-            
             content = base64.b64encode(json.dumps(veri, indent=2).encode()).decode()
-            data = {
-                "message": f"Finans Güncelleme: {dosya_adi}",
-                "content": content,
-                "branch": "main"
-            }
+            data = {"message": f"Veri Güncelleme: {dosya_adi}", "content": content, "branch": "main"}
             if sha: data["sha"] = sha
             requests.put(url, headers=headers, json=data)
         except: pass
@@ -50,10 +42,8 @@ def veri_yukle(dosya_adi, varsayilan):
             return data
         except: return varsayilan
 
-# Sayfa Ayarları
 st.set_page_config(page_title="Finans Karargahı", layout="wide")
 
-# Verileri Yükle
 veriler = veri_yukle("varliklarim.json", {"hisseler": {}, "kripto_paralar": {}, "nakit_ve_emtia": {}})
 gecmis_fiyatlar = veri_yukle("fiyat_gecmis.json", {})
 gecmis_kayitlar = [k for k in veri_yukle("gecmis_arsiv.json", []) if "nan" not in str(k)]
@@ -62,21 +52,21 @@ butce_arsivi = [b for b in veri_yukle("butce_arsiv.json", []) if "nan" not in st
 
 # --- YARDIMCI FONKSİYONLAR ---
 def temizle_sayi(v):
-    if isinstance(v, str):
-        return float(v.replace("₺","").replace("$","").replace(",","").replace("%","").strip())
-    return float(v)
+    if v is None or v == "" or str(v).lower() == "nan": return 0.0
+    if isinstance(v, (int, float)): return float(v)
+    try:
+        return float(str(v).replace("₺","").replace("$","").replace(",","").replace("%","").strip())
+    except: return 0.0
 
 def fmt_yuzde(suan, eski):
-    try:
-        s = temizle_sayi(suan); e = temizle_sayi(eski)
-        if e == 0: return 0.0
-        return ((s - e) / e) * 100
-    except: return 0.0
+    s = temizle_sayi(suan); e = temizle_sayi(eski)
+    if e == 0: return 0.0
+    return ((s - e) / e) * 100
 
 def renk_stili(val):
     if isinstance(val, (int, float)):
-        color = 'red' if val < 0 else 'green' if val > 0 else 'white'
-        return f'color: {color}'
+        if val < 0: return 'color: red'
+        if val > 0: return 'color: green'
     return ''
 
 def doviz_cek():
@@ -184,15 +174,22 @@ if sayfa == "Ana Panel":
 
 # --- GEÇMİŞ PERFORMANS ---
 elif sayfa == "Geçmiş Performans":
-    st.title("📜 Arşiv")
-    if not gecmis_kayitlar: st.info("Yok.")
+    st.title("📜 Detaylı Portföy Arşivi")
+    if not gecmis_kayitlar:
+        st.info("Henüz kayıt bulunmuyor.")
     else:
         df_a = pd.DataFrame(gecmis_kayitlar[::-1])
-        # Renklendirme için sayısal kolonlar oluştur
-        df_a["Deg_TL_Num"] = df_a["Değişim (TL)"].apply(lambda x: float(str(x).replace("%","")) if x else 0)
-        df_a["Deg_USD_Num"] = df_a["Değişim ($)"].apply(lambda x: float(str(x).replace("%","")) if x else 0)
         
-        st.dataframe(df_a.style.applymap(renk_stili, subset=["Deg_TL_Num", "Deg_USD_Num"]), use_container_width=True)
+        # Hata Çözümü: Verileri güvenli şekilde sayıya çevir 
+        df_a["Deg_TL_Num"] = df_a["Değişim (TL)"].apply(temizle_sayi)
+        df_a["Deg_USD_Num"] = df_a["Değişim ($)"].apply(temizle_sayi)
+        
+        # Tabloyu Renkli Göster
+        st.dataframe(
+            df_a.style.applymap(renk_stili, subset=["Deg_TL_Num", "Deg_USD_Num"])
+            .format({"Deg_TL_Num": "{:+.2f}%", "Deg_USD_Num": "{:+.2f}%"}), 
+            use_container_width=True
+        )
 
 # --- BÜTÇE YÖNETİMİ ---
 elif sayfa == "Bütçe Yönetimi":
@@ -201,7 +198,7 @@ elif sayfa == "Bütçe Yönetimi":
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Gelir")
-        y_g = st.text_input("Gelir Ekle")
+        y_g = st.text_input("Gelir Adı Ekle")
         if st.button("Ekle", key="gelir_btn"):
             if y_g: butce_verisi["gelirler"][y_g] = 0.0; github_a_kaydet("butce.json", butce_verisi); st.rerun()
         for k, v in butce_verisi["gelirler"].items():
