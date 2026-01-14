@@ -146,7 +146,7 @@ def piyasa_yorumu_uret(varlik_adi, degisim_orani, tip):
     try:
         response = model.generate_content(prompt)
         return response.text.strip()
-    except:
+    except Exception as e: st.write(e)
         return "Yorum şu an yüklenemedi."
 
 @st.cache_data(ttl=3600) # Analizleri 1 saat boyunca hafızada tutar
