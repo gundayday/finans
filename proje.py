@@ -124,6 +124,31 @@ def hisse_fiyat_cek(hisse_listesi):
         except: res[h] = 0
     return res
 
+    import google.generativeai as genai
+
+# Gemini Kurulumu
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+def piyasa_yorumu_uret(varlik_adi, degisim_orani, tip):
+    """Gemini API kullanarak varlık için güncel piyasa yorumu alır."""
+    if "GEMINI_API_KEY" not in st.secrets:
+        return "API Anahtarı bulunamadı."
+    
+    prompt = f"""
+    Sen uzman bir finansal analistsin. Şu anki varlık: {varlik_adi}. 
+    Son fiyat değişimi: %{degisim_orani}. Varlık tipi: {tip}.
+    Bu varlığın dünyadaki güncel (Ocak 2026) ekonomik koşullara göre neden bu performansı sergilediğini 
+    çok kısa, maksimum 20 kelime ile açıkla. Teknik terimler kullanabilirsin.
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except:
+        return "Yorum şu an yüklenemedi."
+
 # --- NAVİGASYON ---
 st.sidebar.title("💳 Finans Merkezi")
 sayfa = st.sidebar.radio("Menü:", ["Ana Panel", "Geçmiş Performans", "Bütçe Yönetimi", "Bütçe Arşivi"])
