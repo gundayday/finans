@@ -9,6 +9,7 @@ from datetime import datetime
 import plotly.express as px
 import base64
 import numpy as np
+import google.generativeai as genai
 
 # --- GITHUB OTOMATIK KAYIT FONKSIYONU ---
 def github_a_kaydet(dosya_adi, veri):
