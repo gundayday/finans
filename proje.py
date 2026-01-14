@@ -124,8 +124,7 @@ def hisse_fiyat_cek(hisse_listesi):
             res[h] = f
         except: res[h] = 0
     return res
-
-    import google.generativeai as genai
+    
 
 # Gemini Kurulumu
 if "GEMINI_API_KEY" in st.secrets:
@@ -149,6 +148,27 @@ def piyasa_yorumu_uret(varlik_adi, degisim_orani, tip):
         return response.text.strip()
     except:
         return "Yorum şu an yüklenemedi."
+
+@st.cache_data(ttl=3600) # Analizleri 1 saat boyunca hafızada tutar
+def ai_analiz_uret(varlik_verileri_json):
+    """Varlık listesine göre Gemini'den piyasa yorumu alır."""
+    if "GEMINI_API_KEY" not in st.secrets:
+        return {}
+    
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    varliklar = json.loads(varlik_verileri_json)
+    analizler = {}
+    
+    for v in varliklar:
+        try:
+            prompt = f"{v} varlığının şu anki (Ocak 2026) finansal durumunu ve değişim nedenini 12 kelimede özetle."
+            response = model.generate_content(prompt)
+            analizler[v] = response.text.strip()
+        except:
+            analizler[v] = "Piyasa verisi şu an analiz edilemiyor."
+    return analizler
 
 # --- NAVİGASYON ---
 st.sidebar.title("💳 Finans Merkezi")
@@ -271,6 +291,47 @@ if sayfa == "Ana Panel":
         })
 
     st.table(pd.DataFrame(analiz_df))
+
+    # --- ADIM 3: AI ANALİZ VE DİNAMİK BALONCUK GRAFİĞİ ---
+    st.markdown("---")
+    st.markdown("### 🔍 Akıllı Performans Analizi (Gemini AI)")
+    
+    # Tablodaki tüm verileri birleştirelim
+    tum_veriler = []
+    # res_k, res_n, res_h içerisindeki verileri ciz_tablo'dan alıp buraya göndermek için
+    # her kategori için oluşturduğumuz listeleri birleştiriyoruz.
+    # Not: Bu kısmın çalışması için ciz_tablo içinde oluşturulan 'liste' değişkenine ihtiyacımız var.
+    # Şimdilik mevcut varlık isimlerinden bir liste yapalım:
+    varlik_isimleri = list(veriler["kripto_paralar"].keys()) + list(veriler["hisseler"].keys()) + list(veriler["nakit_ve_emtia"].keys())
+    
+    # Gemini'den yorumları al (JSON string gönderiyoruz ki cache çalışsın)
+    yorumlar = ai_analiz_uret(json.dumps(varlik_isimleri))
+    
+    # Grafik için basit bir DataFrame
+    grafik_data = []
+    # Kripto, Hisse ve Nakit toplamlarını içeren basit bir görselleştirme
+    for v_adi, v_yorum in yorumlar.items():
+        # Bu varlığın K/Z oranını geçmiş fiyatlardan çekelim
+        f_usd = gecmis_fiyatlar.get(f"{v_adi}_usd", 0)
+        grafik_data.append({
+            "Varlık": v_adi.upper(),
+            "Analiz": v_yorum,
+            "Fiyat ($)": f_usd
+        })
+    
+    if grafik_data:
+        df_grafik = pd.DataFrame(grafik_data)
+        fig = px.scatter(
+            df_grafik, 
+            x="Varlık", 
+            y="Fiyat ($)",
+            size_max=40,
+            hover_name="Varlık",
+            hover_data={"Analiz": True, "Fiyat ($)": ":.2f"},
+            title="Varlıkların Üzerine Gelerek AI Analizini Okuyun"
+        )
+        # Baloncukların içine AI analizini yerleştirdik
+        st.plotly_chart(fig, use_container_width=True)
     
     if m_oranlar["Yüksek Risk (Kripto)"] > 40:
         st.warning("👉 Kripto ağırlığın hedeflediğin %30'un üzerinde. Kar realize etmeyi düşünebilirsin.")
