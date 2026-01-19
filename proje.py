@@ -57,10 +57,7 @@ def veri_yukle(dosya_adi, varsayilan):
                 for kat in data:
                     for vid in data[kat]:
                         if not isinstance(data[kat][vid], dict):
-                            data[kat][vid] = {
-                                "miktar": data[kat][vid],
-                                "maliyet_usd": 0.0,
-                            }
+                            data[kat][vid] = {"miktar": data[kat][vid], "maliyet_usd": 0.0}
             return data
         except:
             return varsayilan
@@ -98,7 +95,8 @@ def doviz_cek():
         res = requests.get("https://www.doviz.com/", timeout=5)
         soup = BeautifulSoup(res.text, "html.parser")
         def t(sid):
-            return float(soup.find("span", {"data-socket-key": sid}).text.strip().replace(".", "").replace(",", "."))
+            val = soup.find("span", {"data-socket-key": sid}).text.strip().replace(".", "").replace(",", ".")
+            return float(val)
         return {"USD": t("USD"), "EUR": t("EUR"), "GBP": t("GBP"), "gram-altin": t("gram-altin")}
     except:
         return {"USD": gecmis_fiyatlar.get("USD_tl", 35.0)}
@@ -124,6 +122,55 @@ def hisse_fiyat_cek(hisse_listesi):
         except: res[h] = 0
     return res
 
+# --- MODÜLER HESAPLAMA VE GÖSTERİM ---
+
+def hesapla_varlik_verileri(kat, varliklar, kaynak, tip, usd_try):
+    """Sadece matematiksel hesaplamaları yapar."""
+    liste = []
+    t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
+    
+    for vid, data in varliklar.items():
+        mik, mal_usd = data["miktar"], data["maliyet_usd"]
+        
+        # Fiyat Belirleme Mantığı
+        if tip == "kripto":
+            f_usd = kaynak.get(vid, {}).get("usd", 0)
+            if f_usd <= 0: f_usd = gecmis_fiyatlar.get(f"{vid}_usd", 0)
+            f_tl = f_usd * usd_try
+        else:
+            f_tl = kaynak.get(vid, 0) if tip == "hisse" else kurlar.get({"dolar": "USD", "euro": "EUR", "sterlin": "GBP", "gram_altin": "gram-altin"}.get(vid), 0)
+            if f_tl <= 0: f_tl = gecmis_fiyatlar.get(f"{vid}_tl", 0)
+            f_usd = f_tl / usd_try if usd_try > 0 else 0
+
+        kz_yuzde = ((f_usd - mal_usd) / mal_usd * 100) if mal_usd > 0 else 0
+        
+        # Toplamlar
+        t_tl += mik * f_tl
+        t_usd += mik * f_usd
+        t_e_tl += mik * gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
+        t_e_usd += mik * gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
+
+        liste.append({
+            "Varlık": vid.upper(), "Miktar": mik, "Maliyet ($)": mal_usd, "Birim Fiyat ($)": f_usd,
+            "K/Z %": kz_yuzde, "Değer (TL)": mik * f_tl, "Değ% (TL)": fmt_yuzde(f_tl, gecmis_fiyatlar.get(f"{vid}_tl", f_tl)),
+            "Değer ($)": mik * f_usd, "Değ% ($)": fmt_yuzde(f_usd, gecmis_fiyatlar.get(f"{vid}_usd", f_usd)),
+        })
+        # Geçmiş fiyat güncelleme (Side effect ama gerekli)
+        gecmis_fiyatlar[f"{vid}_tl"], gecmis_fiyatlar[f"{vid}_usd"] = f_tl, f_usd
+
+    return liste, {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl, "e_usd": t_e_usd}
+
+def tablo_goster(baslik, veri_listesi, toplamlar):
+    """Sadece görselleştirme yapar."""
+    st.subheader(baslik)
+    if veri_listesi:
+        df = pd.DataFrame(veri_listesi)
+        st.dataframe(df.style.format({
+            "Maliyet ($)": "${:,.2f}", "Birim Fiyat ($)": "${:,.2f}", "K/Z %": "{:+.2f}%",
+            "Değer (TL)": "₺{:,.2f}", "Değer ($)": "${:,.2f}", "Değ% (TL)": "{:+.2f}%", "Değ% ($)": "{:+.2f}%",
+        }).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]), use_container_width=True)
+        st.info(f"**Ara Toplam:** ₺{toplamlar['tl']:,.2f} | ${toplamlar['usd']:,.2f}")
+
 # --- NAVİGASYON ---
 st.sidebar.title("💳 Finans Merkezi")
 sayfa = st.sidebar.radio("Menü:", ["Ana Panel", "Geçmiş Performans", "Bütçe Yönetimi", "Bütçe Arşivi"])
@@ -136,51 +183,15 @@ if sayfa == "Ana Panel":
     k_fiyatlar = kripto_fiyat_cek(veriler["kripto_paralar"])
     h_fiyatlar = hisse_fiyat_cek(veriler["hisseler"].keys())
 
-    if "man_f" not in st.session_state:
-        st.session_state.man_f = {}
+    # Verileri Hesapla
+    list_k, res_k = hesapla_varlik_verileri("kripto_paralar", veriler["kripto_paralar"], k_fiyatlar, "kripto", usd_try)
+    list_n, res_n = hesapla_varlik_verileri("nakit_ve_emtia", veriler["nakit_ve_emtia"], kurlar, "nakit", usd_try)
+    list_h, res_h = hesapla_varlik_verileri("hisseler", veriler["hisseler"], h_fiyatlar, "hisse", usd_try)
 
-    def ciz_tablo(kat, varliklar, kaynak, tip):
-        liste = []
-        t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
-        for vid, data in varliklar.items():
-            mik, mal_usd = data["miktar"], data["maliyet_usd"]
-            man = st.session_state.man_f.get(f"m_{kat}_{vid}", 0)
-            
-            if tip == "kripto":
-                f_usd = man if man > 0 else kaynak.get(vid, {}).get("usd", 0)
-                if f_usd <= 0: f_usd = gecmis_fiyatlar.get(f"{vid}_usd", 0)
-                f_tl = f_usd * usd_try
-            else:
-                f_tl = man if man > 0 else (kaynak.get(vid, 0) if tip == "hisse" else kurlar.get({"dolar": "USD", "euro": "EUR", "sterlin": "GBP", "gram_altin": "gram-altin"}.get(vid), 0))
-                if (vid.lower() == "gmstr.is" and f_tl < 100) or f_tl <= 0: f_tl = gecmis_fiyatlar.get(f"{vid}_tl", 0)
-                f_usd = f_tl / usd_try
-
-            kz_yuzde = ((f_usd - mal_usd) / mal_usd * 100) if mal_usd > 0 else 0
-            t_tl += mik * f_tl
-            t_usd += mik * f_usd
-            t_e_tl += mik * gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
-            t_e_usd += mik * gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
-
-            liste.append({
-                "Varlık": vid.upper(), "Miktar": mik, "Maliyet ($)": mal_usd, "Birim Fiyat ($)": f_usd,
-                "K/Z %": kz_yuzde, "Değer (TL)": mik * f_tl, "Değ% (TL)": fmt_yuzde(f_tl, gecmis_fiyatlar.get(f"{vid}_tl", f_tl)),
-                "Değer ($)": mik * f_usd, "Değ% ($)": fmt_yuzde(f_usd, gecmis_fiyatlar.get(f"{vid}_usd", f_usd)),
-            })
-            gecmis_fiyatlar[f"{vid}_tl"], gecmis_fiyatlar[f"{vid}_usd"] = f_tl, f_usd
-
-        st.subheader(kat.replace("_", " ").title())
-        if liste:
-            df = pd.DataFrame(liste)
-            st.dataframe(df.style.format({
-                "Maliyet ($)": "${:,.2f}", "Birim Fiyat ($)": "${:,.2f}", "K/Z %": "{:+.2f}%",
-                "Değer (TL)": "₺{:,.2f}", "Değer ($)": "${:,.2f}", "Değ% (TL)": "{:+.2f}%", "Değ% ($)": "{:+.2f}%",
-            }).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]), use_container_width=True)
-            st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
-        return {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl, "e_usd": t_e_usd}
-
-    res_k = ciz_tablo("kripto_paralar", veriler["kripto_paralar"], k_fiyatlar, "kripto")
-    res_n = ciz_tablo("nakit_ve_emtia", veriler["nakit_ve_emtia"], None, "nakit")
-    res_h = ciz_tablo("hisseler", veriler["hisseler"], h_fiyatlar, "hisse")
+    # Tabloları Göster
+    tablo_goster("Kripto Paralar", list_k, res_k)
+    tablo_goster("Nakit ve Emtia", list_n, res_n)
+    tablo_goster("Hisseler", list_h, res_h)
 
     g_tl = res_k["tl"] + res_n["tl"] + res_h["tl"]
     g_usd = res_k["usd"] + res_n["usd"] + res_h["usd"]
@@ -193,37 +204,17 @@ if sayfa == "Ana Panel":
     c2.metric("GENEL TOPLAM ($)", f"${g_usd:,.2f}", f"{fmt_yuzde(g_usd, e_usd):+.2f}%")
     c3.metric("Dolar Kuru", f"₺{usd_try}")
 
-    # --- ADIM 1 (GARANTİ ÇÖZÜM): RİSK VE DAĞILIM ANALİZİ ---
+    # --- RİSK VE DAĞILIM ANALİZİ ---
     st.markdown("### ⚖️ Portföy Risk ve Dağılım Analizi")
+    gumus_deger_tl = sum(d["Miktar"] * gecmis_fiyatlar.get(f"{d['Varlık'].lower()}_tl", 0) for d in list_h if "GMSTR" in d["Varlık"])
+    altin_deger_tl = sum(d["Miktar"] * gecmis_fiyatlar.get(f"{d['Varlık'].lower()}_tl", 0) for d in list_h if "GLDTR" in d["Varlık"])
     
-    # 1. Adım: Hisseler içindeki Altın ve Gümüşü bulalım (Büyük/Küçük harf fark etmeksizin)
-    gumus_deger_tl = 0
-    altin_deger_tl = 0
-    
-    for sembol, data in veriler["hisseler"].items():
-        s_upper = sembol.upper()
-        miktar = data["miktar"]
-        # Fiyatı gecmis_fiyatlar'dan alırken ana panelde kaydedilen formatta alıyoruz
-        fiyat = gecmis_fiyatlar.get(f"{sembol}_tl", 0)
-        
-        if "GMSTR" in s_upper:
-            gumus_deger_tl = miktar * fiyat
-        elif "GLDTR" in s_upper:
-            altin_deger_tl = miktar * fiyat
-
-    # 2. Adım: res_h["tl"] zaten tüm hisselerin toplamı. 
-    # Riskli hisseleri bulmak için toplamdan altın/gümüşü düşüyoruz.
     riskli_hisse_degeri = max(0, res_h["tl"] - (gumus_deger_tl + altin_deger_tl))
-    
-    # 3. Adım: Güvenli liman = Nakitler + Çıkardığımız Altın/Gümüş
     guvenli_liman_degeri = res_n["tl"] + gumus_deger_tl + altin_deger_tl
-    
-    # 4. Adım: Kripto zaten belli
     yuksek_risk_kripto_degeri = res_k["tl"]
     
-    toplam_servet = riskli_hisse_degeri + guvenli_liman_degeri + yuksek_risk_kripto_degeri
-    if toplam_servet <= 0: toplam_servet = 1
-
+    toplam_servet = max(1, riskli_hisse_degeri + guvenli_liman_degeri + yuksek_risk_kripto_degeri)
+    
     m_oranlar = {
         "Hisse (Şirket Riskli)": (riskli_hisse_degeri / toplam_servet) * 100,
         "Güvenli Liman (Altın/Gümüş/Nakit)": (guvenli_liman_degeri / toplam_servet) * 100,
@@ -231,45 +222,30 @@ if sayfa == "Ana Panel":
     }
     
     ideal_oranlar = {"Hisse (Şirket Riskli)": 25.0, "Güvenli Liman (Altın/Gümüş/Nakit)": 45.0, "Yüksek Risk (Kripto)": 30.0}
-
     analiz_df = []
     for anahtar in m_oranlar.keys():
         fark = m_oranlar[anahtar] - ideal_oranlar[anahtar]
         durum = "✅ Dengeli" if abs(fark) < 5 else ("⚠️ Fazla" if fark > 0 else "📉 Eksik")
-        analiz_df.append({
-            "Varlık Sınıfı": anahtar, 
-            "Mevcut Oran": f"%{m_oranlar[anahtar]:.1f}", 
-            "İdeal Oran": f"%{ideal_oranlar[anahtar]:.1f}", 
-            "Fark": f"{fark:+.1f}%", 
-            "Durum": durum
-        })
+        analiz_df.append({"Varlık Sınıfı": anahtar, "Mevcut Oran": f"%{m_oranlar[anahtar]:.1f}", "İdeal Oran": f"%{ideal_oranlar[anahtar]:.1f}", "Fark": f"{fark:+.1f}%", "Durum": durum})
 
     st.table(pd.DataFrame(analiz_df))
-    
-    if m_oranlar["Yüksek Risk (Kripto)"] > 40:
-        st.warning("👉 Kripto ağırlığın hedeflediğin %30'un üzerinde. Kar realize etmeyi düşünebilirsin.")
-    elif m_oranlar["Hisse (Şirket Riskli)"] < 15:
-        st.info("👉 Şirket hissesi ağırlığın düşük kalmış. Uzun vadeli büyüme için ekleme yapabilirsin.")
-    # ---------------------------------------------------
 
     st.markdown("### 📈 Maliyet/Değer Performansı (Kâr/Zarar)")
-    kat_maliyetler = {}
-    toplam_maliyet_usd = 0
-    kategoriler = {"Kripto Paralar": veriler["kripto_paralar"], "Nakit ve Emtia": veriler["nakit_ve_emtia"], "Hisseler": veriler["hisseler"]}
-    
-    for ad, varlik_listesi in kategoriler.items():
-        m = sum(v["miktar"] * v["maliyet_usd"] for v in varlik_listesi.values())
-        kat_maliyetler[ad] = m
-        toplam_maliyet_usd += m
+    kat_maliyetler = {
+        "Kripto": sum(v["miktar"] * v["maliyet_usd"] for v in veriler["kripto_paralar"].values()),
+        "Nakit": sum(v["miktar"] * v["maliyet_usd"] for v in veriler["nakit_ve_emtia"].values()),
+        "Hisse": sum(v["miktar"] * v["maliyet_usd"] for v in veriler["hisseler"].values())
+    }
+    toplam_maliyet_usd = sum(kat_maliyetler.values())
 
     m1, m2, m3, m4 = st.columns(4)
     def kz_metrik_yaz(col, baslik, guncel_usd, maliyet_usd):
         oran = ((guncel_usd - maliyet_usd) / maliyet_usd * 100) if maliyet_usd > 0 else 0
         col.metric(baslik, f"{oran:+.2f}%", help=f"Toplam Maliyet: ${maliyet_usd:,.2f}")
 
-    kz_metrik_yaz(m1, "Kripto Paralar", res_k["usd"], kat_maliyetler["Kripto Paralar"])
-    kz_metrik_yaz(m2, "Nakit ve Emtia", res_n["usd"], kat_maliyetler["Nakit ve Emtia"])
-    kz_metrik_yaz(m3, "Hisseler", res_h["usd"], kat_maliyetler["Hisseler"])
+    kz_metrik_yaz(m1, "Kripto Paralar", res_k["usd"], kat_maliyetler["Kripto"])
+    kz_metrik_yaz(m2, "Nakit ve Emtia", res_n["usd"], kat_maliyetler["Nakit"])
+    kz_metrik_yaz(m3, "Hisseler", res_h["usd"], kat_maliyetler["Hisse"])
     kz_metrik_yaz(m4, "TÜM VARLIKLAR", g_usd, toplam_maliyet_usd)
     
     if st.button("💰 GÜNÜ KAPAT"):
@@ -288,7 +264,7 @@ if sayfa == "Ana Panel":
         st.success("GitHub'a arşivlendi!")
         st.rerun()
 
-# --- DİĞER SAYFALAR (GEÇMİŞ, BÜTÇE VS.) ---
+# --- DİĞER SAYFALAR ---
 elif sayfa == "Geçmiş Performans":
     st.title("📜 Arşiv")
     if not gecmis_kayitlar: st.info("Yok.")
