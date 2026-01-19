@@ -615,4 +615,4 @@ elif sayfa == "Bütçe Yönetimi":
         b_k = {
             "tarih": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "GELİR (TL)": f"₺{t_gel:,.0f}",
-            "GİDER (TL)": f"₺{t_gid:,.0f
+            "GİDER (TL)": f"₺{t_gid:,.0f}"
