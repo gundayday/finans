@@ -7,6 +7,10 @@
     "GLDTR.IS": {
       "miktar": 589.0,
       "maliyet_usd": 8.27
+    },
+    "amzn": {
+      "miktar": 2.058894985,
+      "maliyet_usd": 242.84
     }
   },
   "kripto_paralar": {
