@@ -197,100 +197,99 @@ if sayfa == "Ana Panel":
     if "man_f" not in st.session_state:
         st.session_state.man_f = {}
 
-def ciz_tablo(kat, varliklar, kaynak, tip):
-    # DİKKAT: Buradaki kodlar def hizasından içeride olmalı
-    liste = []
-    t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
-    
-    for vid, data in varliklar.items():
-        mik, mal_usd = data["miktar"], data["maliyet_usd"]
-        man = st.session_state.man_f.get(f"m_{kat}_{vid}", 0)
+    def ciz_tablo(kat, varliklar, kaynak, tip):
+        # BU KISIM ARTIK DOĞRU GİRİNTİLENMİŞ DURUMDA
+        liste = []
+        t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
+        for vid, data in varliklar.items():
+            mik, mal_usd = data["miktar"], data["maliyet_usd"]
+            man = st.session_state.man_f.get(f"m_{kat}_{vid}", 0)
 
-        # --- FİYAT HESAPLAMA MANTIĞI (Dolar/TL Ayırımı) ---
-        if tip == "kripto":
-            f_usd = man if man > 0 else kaynak.get(vid, {}).get("usd", 0)
-            if f_usd <= 0:
-                f_usd = gecmis_fiyatlar.get(f"{vid}_usd", 0)
-            f_tl = f_usd * usd_try
-        
-        elif tip == "hisse":
-            raw_fiyat = man if man > 0 else kaynak.get(vid, 0)
-            
-            # EĞER HİSSE KODUNDA '.IS' YOKSA (AMZN, TSLA vb.) DOLAR BAZLIDIR
-            if ".is" not in vid.lower() and man == 0:
-                f_usd = raw_fiyat
-                if f_usd <= 0: # Hata varsa geçmiş veriyi kullan
-                     f_usd = gecmis_fiyatlar.get(f"{vid}_usd", 0)
+            # --- FİYAT HESAPLAMA MANTIĞI DÜZELTİLDİ ---
+            if tip == "kripto":
+                f_usd = man if man > 0 else kaynak.get(vid, {}).get("usd", 0)
+                if f_usd <= 0:
+                    f_usd = gecmis_fiyatlar.get(f"{vid}_usd", 0)
                 f_tl = f_usd * usd_try
-            else:
-                # TÜRK HİSSESİ (TL BAZLI)
-                f_tl = raw_fiyat
-                # GMSTR gibi özel durum kontrolü
-                if (vid.lower() == "gmstr.is" and f_tl < 100) or f_tl <= 0:
-                    f_tl = gecmis_fiyatlar.get(f"{vid}_tl", 0)
-                f_usd = f_tl / usd_try
+            
+            elif tip == "hisse":
+                raw_fiyat = man if man > 0 else kaynak.get(vid, 0)
+                
+                # EĞER HİSSE KODUNDA '.IS' YOKSA (AMZN, TSLA vb.) DOLAR BAZLIDIR
+                if ".is" not in vid.lower() and man == 0:
+                    f_usd = raw_fiyat
+                    if f_usd <= 0: # Hata varsa geçmiş veriyi kullan
+                        f_usd = gecmis_fiyatlar.get(f"{vid}_usd", 0)
+                    f_tl = f_usd * usd_try
+                else:
+                    # TÜRK HİSSESİ (TL BAZLI)
+                    f_tl = raw_fiyat
+                    # GMSTR gibi özel durum kontrolü
+                    if (vid.lower() == "gmstr.is" and f_tl < 100) or f_tl <= 0:
+                        f_tl = gecmis_fiyatlar.get(f"{vid}_tl", 0)
+                    f_usd = f_tl / usd_try
 
-        else: # Nakit ve Emtia
-            f_tl = (
-                man
-                if man > 0
-                else kurlar.get(
-                    {
-                        "dolar": "USD",
-                        "euro": "EUR",
-                        "sterlin": "GBP",
-                        "gram_altin": "gram-altin",
-                    }.get(vid),
-                    0,
+            else: # Nakit ve Emtia
+                f_tl = (
+                    man
+                    if man > 0
+                    else kurlar.get(
+                        {
+                            "dolar": "USD",
+                            "euro": "EUR",
+                            "sterlin": "GBP",
+                            "gram_altin": "gram-altin",
+                        }.get(vid),
+                        0,
+                    )
                 )
-            )
-            f_usd = f_tl / usd_try
-        # ------------------------------------------
+                f_usd = f_tl / usd_try
+            # ------------------------------------------
 
-        kz_yuzde = ((f_usd - mal_usd) / mal_usd * 100) if mal_usd > 0 else 0
-        t_tl += mik * f_tl
-        t_usd += mik * f_usd
-        t_e_tl += mik * gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
-        t_e_usd += mik * gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
+            kz_yuzde = ((f_usd - mal_usd) / mal_usd * 100) if mal_usd > 0 else 0
+            t_tl += mik * f_tl
+            t_usd += mik * f_usd
+            t_e_tl += mik * gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
+            t_e_usd += mik * gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
 
-        liste.append(
-            {
-                "Varlık": vid.upper(),
-                "Miktar": mik,
-                "Maliyet ($)": mal_usd,
-                "Birim Fiyat ($)": f_usd,
-                "K/Z %": kz_yuzde,
-                "Değer (TL)": mik * f_tl,
-                "Değ% (TL)": fmt_yuzde(
-                    f_tl, gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
-                ),
-                "Değer ($)": mik * f_usd,
-                "Değ% ($)": fmt_yuzde(
-                    f_usd, gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
-                ),
-            }
-        )
-        gecmis_fiyatlar[f"{vid}_tl"], gecmis_fiyatlar[f"{vid}_usd"] = f_tl, f_usd
-
-    st.subheader(kat.replace("_", " ").title())
-    if liste:
-        df = pd.DataFrame(liste)
-        st.dataframe(
-            df.style.format(
+            liste.append(
                 {
-                    "Maliyet ($)": "${:,.2f}",
-                    "Birim Fiyat ($)": "${:,.2f}",
-                    "K/Z %": "{:+.2f}%",
-                    "Değer (TL)": "₺{:,.2f}",
-                    "Değer ($)": "${:,.2f}",
-                    "Değ% (TL)": "{:+.2f}%",
-                    "Değ% ($)": "{:+.2f}%",
+                    "Varlık": vid.upper(),
+                    "Miktar": mik,
+                    "Maliyet ($)": mal_usd,
+                    "Birim Fiyat ($)": f_usd,
+                    "K/Z %": kz_yuzde,
+                    "Değer (TL)": mik * f_tl,
+                    "Değ% (TL)": fmt_yuzde(
+                        f_tl, gecmis_fiyatlar.get(f"{vid}_tl", f_tl)
+                    ),
+                    "Değer ($)": mik * f_usd,
+                    "Değ% ($)": fmt_yuzde(
+                        f_usd, gecmis_fiyatlar.get(f"{vid}_usd", f_usd)
+                    ),
                 }
-            ).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]),
-            use_container_width=True,
-        )
-        st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
-    return {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl, "e_usd": t_e_usd}
+            )
+            gecmis_fiyatlar[f"{vid}_tl"], gecmis_fiyatlar[f"{vid}_usd"] = f_tl, f_usd
+
+        st.subheader(kat.replace("_", " ").title())
+        if liste:
+            df = pd.DataFrame(liste)
+            st.dataframe(
+                df.style.format(
+                    {
+                        "Maliyet ($)": "${:,.2f}",
+                        "Birim Fiyat ($)": "${:,.2f}",
+                        "K/Z %": "{:+.2f}%",
+                        "Değer (TL)": "₺{:,.2f}",
+                        "Değer ($)": "${:,.2f}",
+                        "Değ% (TL)": "{:+.2f}%",
+                        "Değ% ($)": "{:+.2f}%",
+                    }
+                ).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]),
+                use_container_width=True,
+            )
+            st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
+        return {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl, "e_usd": t_e_usd}
 
     res_k = ciz_tablo("kripto_paralar", veriler["kripto_paralar"], k_fiyatlar, "kripto")
     res_n = ciz_tablo("nakit_ve_emtia", veriler["nakit_ve_emtia"], None, "nakit")
@@ -307,17 +306,15 @@ def ciz_tablo(kat, varliklar, kaynak, tip):
     c2.metric("GENEL TOPLAM ($)", f"${g_usd:,.2f}", f"{fmt_yuzde(g_usd, e_usd):+.2f}%")
     c3.metric("Dolar Kuru", f"₺{usd_try}")
 
-    # --- ADIM 1 (GARANTİ ÇÖZÜM): RİSK VE DAĞILIM ANALİZİ ---
+    # --- RİSK VE DAĞILIM ANALİZİ ---
     st.markdown("### ⚖️ Portföy Risk ve Dağılım Analizi")
 
-    # 1. Adım: Hisseler içindeki Altın ve Gümüşü bulalım (Büyük/Küçük harf fark etmeksizin)
     gumus_deger_tl = 0
     altin_deger_tl = 0
 
     for sembol, data in veriler["hisseler"].items():
         s_upper = sembol.upper()
         miktar = data["miktar"]
-        # Fiyatı gecmis_fiyatlar'dan alırken ana panelde kaydedilen formatta alıyoruz
         fiyat = gecmis_fiyatlar.get(f"{sembol}_tl", 0)
 
         if "GMSTR" in s_upper:
@@ -325,14 +322,8 @@ def ciz_tablo(kat, varliklar, kaynak, tip):
         elif "GLDTR" in s_upper:
             altin_deger_tl = miktar * fiyat
 
-    # 2. Adım: res_h["tl"] zaten tüm hisselerin toplamı.
-    # Riskli hisseleri bulmak için toplamdan altın/gümüşü düşüyoruz.
     riskli_hisse_degeri = max(0, res_h["tl"] - (gumus_deger_tl + altin_deger_tl))
-
-    # 3. Adım: Güvenli liman = Nakitler + Çıkardığımız Altın/Gümüş
     guvenli_liman_degeri = res_n["tl"] + gumus_deger_tl + altin_deger_tl
-
-    # 4. Adım: Kripto zaten belli
     yuksek_risk_kripto_degeri = res_k["tl"]
 
     toplam_servet = (
@@ -380,7 +371,6 @@ def ciz_tablo(kat, varliklar, kaynak, tip):
         st.info(
             "👉 Şirket hissesi ağırlığın düşük kalmış. Uzun vadeli büyüme için ekleme yapabilirsin."
         )
-    # ---------------------------------------------------
 
     st.markdown("### 📈 Maliyet/Değer Performansı (Kâr/Zarar)")
     kat_maliyetler = {}
