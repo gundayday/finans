@@ -197,14 +197,16 @@ if sayfa == "Ana Panel":
     if "man_f" not in st.session_state:
         st.session_state.man_f = {}
 
-    def ciz_tablo(kat, varliklar, kaynak, tip):
+def ciz_tablo(kat, varliklar, kaynak, tip):
+    # DİKKAT: Buradaki kodlar def hizasından içeride olmalı
     liste = []
     t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
+    
     for vid, data in varliklar.items():
         mik, mal_usd = data["miktar"], data["maliyet_usd"]
         man = st.session_state.man_f.get(f"m_{kat}_{vid}", 0)
 
-        # --- FİYAT HESAPLAMA MANTIĞI DÜZELTİLDİ ---
+        # --- FİYAT HESAPLAMA MANTIĞI (Dolar/TL Ayırımı) ---
         if tip == "kripto":
             f_usd = man if man > 0 else kaynak.get(vid, {}).get("usd", 0)
             if f_usd <= 0:
