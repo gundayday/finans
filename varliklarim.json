@@ -15,6 +15,10 @@
     "aapl": {
       "miktar": 2.003722256,
       "maliyet_usd": 269.99
+    },
+    "tsm": {
+      "miktar": 2.227766886,
+      "maliyet_usd": 336.66
     }
   },
   "kripto_paralar": {
