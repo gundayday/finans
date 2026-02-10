@@ -109,6 +109,23 @@ def veri_yukle(dosya_adi, varsayilan):
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Finans Karargahı", layout="wide")
+st.markdown(
+    """
+    <style>
+    div[data-testid="stButton"] > button {
+        border-radius: 8px;
+    }
+    div[data-testid="stButton"] > button[aria-label="−"] {
+        color: #ff4b4b;
+        border: 1px solid #ff4b4b;
+        padding: 0 0.35rem;
+        min-height: 1.55rem;
+        line-height: 1;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Verileri Yükle
 veriler = veri_yukle(
@@ -494,7 +511,7 @@ elif sayfa == "Bütçe Yönetimi":
         for k in list(butce_verisi["gelirler"].keys()):
             c_del, c_val = st.columns([0.2, 1.8])
             with c_del:
-                if st.button("🔴➖", key=f"sil_gel_{k}"):
+                if st.button("−", key=f"sil_gel_{k}", help="Kalemi sil"):
                     del butce_verisi["gelirler"][k]
                     github_a_kaydet("butce.json", butce_verisi)
                     st.rerun()
@@ -558,7 +575,7 @@ elif sayfa == "Bütçe Yönetimi":
                 butce_verisi["aylik_sabit_gider_bilgi"][kalem] = kayit
             c_del, c_item, c_val, c_end = st.columns([0.2, 2, 1, 1])
             with c_del:
-                if st.button("🔴➖", key=f"sil_bilgi_{kalem}"):
+                if st.button("−", key=f"sil_bilgi_{kalem}", help="Kalemi sil"):
                     del butce_verisi["aylik_sabit_gider_bilgi"][kalem]
                     github_a_kaydet("butce.json", butce_verisi)
                     st.rerun()
@@ -621,11 +638,7 @@ elif sayfa == "Bütçe Yönetimi":
                 {"Ay": referans.strftime("%Y-%m"), "Aylık Sabit Gider (₺)": ay_toplam}
             )
 
-        st.markdown("#### Önümüzdeki 12 Ay Sabit Gider Grafiği (Her Ayın 15'i)")
         df_12 = pd.DataFrame(gelecek_12_ay)
-        fig_12 = px.bar(df_12, x="Ay", y="Aylık Sabit Gider (₺)")
-        fig_12.update_layout(xaxis_title="Ay", yaxis_title="Tutar (₺)")
-        st.plotly_chart(fig_12, use_container_width=True)
     with c2:
         st.subheader("Gider")
         st.write("**Yeni Gider Kalemi Ekle/Güncelle**")
@@ -662,7 +675,7 @@ elif sayfa == "Bütçe Yönetimi":
             for n in list(butce_verisi["giderler"].get(a, {}).keys()):
                 c_del, c_val = st.columns([0.2, 1.8])
                 with c_del:
-                    if st.button("🔴➖", key=f"sil_{a}_{n}"):
+                    if st.button("−", key=f"sil_{a}_{n}", help="Kalemi sil"):
                         del butce_verisi["giderler"][a][n]
                         github_a_kaydet("butce.json", butce_verisi)
                         st.rerun()
@@ -689,16 +702,35 @@ elif sayfa == "Bütçe Yönetimi":
         st.error(f"Top: ₺{t_gid:,.2f}")
 
     net = t_gel - t_gid
-    st.header(f"Net: ₺{net:,.2f}")
-    st.plotly_chart(
-        px.bar(
+    st.markdown(
+        f"<p style='font-size:24px;font-weight:700;margin:0 0 8px 0;'>Net: ₺{net:,.2f}</p>",
+        unsafe_allow_html=True,
+    )
+    g_col1, g_col2 = st.columns(2)
+    with g_col1:
+        fig_gel_gider = px.bar(
             x=["Gelir", "Gider"],
             y=[t_gel, t_gid],
             color=["Gelir", "Gider"],
             color_discrete_map={"Gelir": "green", "Gider": "red"},
-        ),
-        use_container_width=True,
-    )
+            title="Gelir / Gider",
+        )
+        fig_gel_gider.update_layout(height=280, margin=dict(l=10, r=10, t=40, b=10))
+        st.plotly_chart(fig_gel_gider, use_container_width=True)
+    with g_col2:
+        fig_12 = px.bar(
+            df_12,
+            x="Ay",
+            y="Aylık Sabit Gider (₺)",
+            title="Önümüzdeki 12 Ay Sabit Gider (15'i)",
+        )
+        fig_12.update_layout(
+            xaxis_title="Ay",
+            yaxis_title="Tutar (₺)",
+            height=280,
+            margin=dict(l=10, r=10, t=40, b=10),
+        )
+        st.plotly_chart(fig_12, use_container_width=True)
     if st.button("💾 ARŞİVLE"):
         github_a_kaydet("butce.json", butce_verisi)
         net_usd = net / usd_val if usd_val else 0.0
