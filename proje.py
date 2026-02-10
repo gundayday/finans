@@ -261,16 +261,83 @@ def degisim_tooltip_olustur(vid, tip, deg_usd):
     yon = "yükseliş" if deg_usd >= 0 else "düşüş"
     sorgu = varlik_haber_sorgusu(vid, tip)
     haberler = gunluk_haber_maddeleri(sorgu)
-    if not haberler:
-        return (
-            f"Son 24 saatte {vid.upper()} için %{deg_usd:+.2f} ({yon}) hareket var. "
-            "Güncel haber akışı alınamadı, piyasa genel oynaklığı etkili olabilir."
-        )
     cumleler = [f"Son 24 saatte {vid.upper()} %{deg_usd:+.2f} ({yon}) hareket etti."]
+
+    # Yahoo Finance: günlük + saatlik bağlam
+    yf_symbol = None
+    if tip == "hisse":
+        yf_symbol = vid.upper()
+    elif tip == "kripto":
+        kmap = {
+            "bitcoin": "BTC-USD",
+            "ethereum": "ETH-USD",
+            "solana": "SOL-USD",
+            "ripple": "XRP-USD",
+            "avalanche-2": "AVAX-USD",
+            "optimism": "OP-USD",
+            "arbitrum": "ARB-USD",
+            "zksync": "ZK-USD",
+            "eigenlayer": "EIGEN-USD",
+        }
+        yf_symbol = kmap.get(vid.lower())
+    elif tip == "nakit":
+        yf_symbol = {
+            "dolar": "USDTRY=X",
+            "euro": "EURTRY=X",
+            "sterlin": "GBPTRY=X",
+            "gram_altin": "XAUUSD=X",
+        }.get(vid.lower())
+
+    if yf_symbol:
+        try:
+            hist = yf.Ticker(yf_symbol).history(period="2d", interval="60m")
+            if len(hist) > 2:
+                son = float(hist["Close"].iloc[-1])
+                onceki_saat = float(hist["Close"].iloc[-2])
+                onceki_gun = float(hist["Close"].iloc[0])
+                saatlik = ((son - onceki_saat) / onceki_saat * 100) if onceki_saat else 0.0
+                gunluk = ((son - onceki_gun) / onceki_gun * 100) if onceki_gun else 0.0
+                cumleler.append(
+                    f"Yahoo Finance verisine göre saatlik %{saatlik:+.2f}, günlük %{gunluk:+.2f}."
+                )
+        except:
+            pass
+
+    # GLDTR / GMSTR için emtia endeks yorumu
+    vid_upper = vid.upper()
+    if vid_upper == "GLDTR.IS":
+        try:
+            emtia = yf.Ticker("XAUUSD=X").history(period="2d", interval="60m")
+            if len(emtia) > 2:
+                e_son = float(emtia["Close"].iloc[-1])
+                e_gun = float(emtia["Close"].iloc[0])
+                e_deg = ((e_son - e_gun) / e_gun * 100) if e_gun else 0.0
+                cumleler.append(
+                    f"GLDTR altın fiyatına endeksli; spot altında günlük %{e_deg:+.2f} hareket izlendi."
+                )
+        except:
+            pass
+    elif vid_upper == "GMSTR.IS":
+        try:
+            emtia = yf.Ticker("XAGUSD=X").history(period="2d", interval="60m")
+            if len(emtia) > 2:
+                e_son = float(emtia["Close"].iloc[-1])
+                e_gun = float(emtia["Close"].iloc[0])
+                e_deg = ((e_son - e_gun) / e_gun * 100) if e_gun else 0.0
+                cumleler.append(
+                    f"GMSTR gümüş fiyatına endeksli; spot gümüşte günlük %{e_deg:+.2f} hareket izlendi."
+                )
+        except:
+            pass
+
+    if not haberler:
+        cumleler.append("Google News/TradingView tarafında belirgin yeni başlık yakalanamadı.")
+        return " ".join(cumleler[:3])
+
     for h in haberler[:2]:
         zaman = f" ({h['saat']})" if h["saat"] else ""
         cumleler.append(f"{h['kaynak']}{zaman}: {h['baslik']}")
-    return " ".join(cumleler)
+    return " ".join(cumleler[:3])
 
 
 def doviz_cek():
@@ -354,6 +421,7 @@ if sayfa == "Ana Panel":
     def ciz_tablo(kat, varliklar, kaynak, tip):
         # BU KISIM ARTIK DOĞRU GİRİNTİLENMİŞ DURUMDA
         liste = []
+        kod_liste = []
         t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
         for vid, data in varliklar.items():
             mik, mal_usd = data["miktar"], data["maliyet_usd"]
@@ -423,39 +491,58 @@ if sayfa == "Ana Panel":
                     ),
                 }
             )
+            kod_liste.append(vid)
             gecmis_fiyatlar[f"{vid}_tl"], gecmis_fiyatlar[f"{vid}_usd"] = f_tl, f_usd
 
         st.subheader(kat.replace("_", " ").title())
         if liste:
             df = pd.DataFrame(liste)
-            st.dataframe(
-                df.style.format(
-                    {
-                        "Maliyet ($)": "${:,.2f}",
-                        "Birim Fiyat ($)": "${:,.2f}",
-                        "K/Z %": "{:+.2f}%",
-                        "Değer (TL)": "₺{:,.2f}",
-                        "Değer ($)": "${:,.2f}",
-                        "Değ% (TL)": "{:+.2f}%",
-                        "Değ% ($)": "{:+.2f}%",
-                    }
-                ).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]),
-                use_container_width=True,
+            cols = [
+                "Varlık",
+                "Miktar",
+                "Maliyet ($)",
+                "Birim Fiyat ($)",
+                "K/Z %",
+                "Değer (TL)",
+                "Değ% (TL)",
+                "Değer ($)",
+                "Değ% ($)",
+            ]
+            html_rows = []
+            for i, row in df.iterrows():
+                ozet = degisim_tooltip_olustur(kod_liste[i], tip, float(row["Değ% ($)"]))
+                tooltip = html.escape(ozet, quote=True)
+
+                def cfmt(col, val):
+                    if col in ["Maliyet ($)", "Birim Fiyat ($)", "Değer ($)"]:
+                        return f"${float(val):,.2f}"
+                    if col == "Değer (TL)":
+                        return f"₺{float(val):,.2f}"
+                    if col in ["K/Z %", "Değ% (TL)"]:
+                        renk = "red" if float(val) < 0 else ("green" if float(val) > 0 else "#ddd")
+                        return f"<span style='color:{renk}'>{float(val):+.2f}%</span>"
+                    if col == "Değ% ($)":
+                        renk = "red" if float(val) < 0 else ("green" if float(val) > 0 else "#ddd")
+                        return (
+                            f"<span title=\"{tooltip}\" style='color:{renk}; cursor:help;'>"
+                            f"{float(val):+.2f}%</span>"
+                        )
+                    if col == "Miktar":
+                        return f"{float(val):,.6f}"
+                    return str(val)
+
+                tds = "".join([f"<td>{cfmt(c, row[c])}</td>" for c in cols])
+                html_rows.append(f"<tr>{tds}</tr>")
+
+            thead = "".join([f"<th>{c}</th>" for c in cols])
+            table_html = (
+                "<div style='overflow-x:auto'>"
+                "<table style='width:100%; border-collapse:collapse; font-size:0.9rem;'>"
+                f"<thead><tr>{thead}</tr></thead>"
+                f"<tbody>{''.join(html_rows)}</tbody>"
+                "</table></div>"
             )
-            st.caption("Varlık Bazlı Güncel Özet (🛈 üzerine gel)")
-            for satir in liste:
-                varlik_kodu = str(satir["Varlık"]).lower()
-                deg_usd = float(satir["Değ% ($)"])
-                ozet = degisim_tooltip_olustur(varlik_kodu, tip, deg_usd)
-                guvenli_ozet = html.escape(ozet, quote=True)
-                st.markdown(
-                    f"<div style='font-size:0.84rem; margin:2px 0;'>"
-                    f"<b>{satir['Varlık']}</b> "
-                    f"<span title=\"{guvenli_ozet}\" "
-                    f"style='color:#60a5fa; cursor:help; border:1px solid #334155; border-radius:10px; padding:0 6px;'>🛈</span>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+            st.markdown(table_html, unsafe_allow_html=True)
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
         return {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl, "e_usd": t_e_usd}
 
