@@ -577,6 +577,33 @@ elif sayfa == "Bütçe Yönetimi":
         st.info(f"Aylık Sabit Giderler Toplamı (Bilgi): ₺{bilgi_toplam:,.2f}")
     with c2:
         st.subheader("Gider")
+        st.write("**Yeni Gider Kalemi Ekle/Güncelle**")
+        g1, g2, g3 = st.columns([1, 2, 1])
+        with g1:
+            gider_kat = st.selectbox(
+                "Kategori",
+                ["Kredi Kartlari", "Sabit Giderler", "Diger Borclar"],
+                format_func=lambda x: {
+                    "Kredi Kartlari": "Kartlar",
+                    "Sabit Giderler": "Sabit",
+                    "Diger Borclar": "Diğer",
+                }[x],
+                key="gider_kat_sec",
+            )
+        with g2:
+            yeni_gider_adi = st.text_input(
+                "Gider Kalemi", key="yeni_gider_adi", placeholder="Örn: Netflix"
+            )
+        with g3:
+            yeni_gider_tutar = st.number_input(
+                "Tutar (₺)", min_value=0.0, value=0.0, key="yeni_gider_tutar"
+            )
+        if st.button("Gider Ekle/Güncelle", key="gider_ekle_btn") and yeni_gider_adi:
+            butce_verisi["giderler"].setdefault(gider_kat, {})
+            butce_verisi["giderler"][gider_kat][yeni_gider_adi] = float(yeni_gider_tutar)
+            github_a_kaydet("butce.json", butce_verisi)
+            st.success(f"{yeni_gider_adi} eklendi/güncellendi.")
+            st.rerun()
 
         def but_ciz(b, a):
             t = 0
