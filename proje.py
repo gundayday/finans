@@ -491,10 +491,17 @@ elif sayfa == "Bütçe Yönetimi":
             butce_verisi["gelirler"][y_g] = 0.0
             github_a_kaydet("butce.json", butce_verisi)
             st.rerun()
-        for k, v in butce_verisi["gelirler"].items():
-            butce_verisi["gelirler"][k] = st.number_input(
-                f"{k}", value=float(v), key=f"gel_{k}"
-            )
+        for k in list(butce_verisi["gelirler"].keys()):
+            c_del, c_val = st.columns([0.2, 1.8])
+            with c_del:
+                if st.button("🔴➖", key=f"sil_gel_{k}"):
+                    del butce_verisi["gelirler"][k]
+                    github_a_kaydet("butce.json", butce_verisi)
+                    st.rerun()
+            with c_val:
+                butce_verisi["gelirler"][k] = st.number_input(
+                    f"{k}", value=float(butce_verisi["gelirler"][k]), key=f"gel_{k}"
+                )
         t_gel = sum(butce_verisi["gelirler"].values())
         st.success(f"Top: ₺{t_gel:,.2f}")
 
@@ -543,13 +550,18 @@ elif sayfa == "Bütçe Yönetimi":
             st.success(f"{yeni_sabit_kalem} listeye eklendi/güncellendi.")
 
         bilgi_toplam = 0.0
-        st.markdown("**Harcama Kalemi** | **Tutar (₺)** | **Son Bulma Tarihi**")
+        st.markdown("**Sil** | **Harcama Kalemi** | **Tutar (₺)** | **Son Bulma Tarihi**")
         for kalem in list(butce_verisi["aylik_sabit_gider_bilgi"].keys()):
             kayit = butce_verisi["aylik_sabit_gider_bilgi"][kalem]
             if not isinstance(kayit, dict):
                 kayit = {"tutar": float(kayit), "bitis_tarihi": ""}
                 butce_verisi["aylik_sabit_gider_bilgi"][kalem] = kayit
-            c_item, c_val, c_end = st.columns([2, 1, 1])
+            c_del, c_item, c_val, c_end = st.columns([0.2, 2, 1, 1])
+            with c_del:
+                if st.button("🔴➖", key=f"sil_bilgi_{kalem}"):
+                    del butce_verisi["aylik_sabit_gider_bilgi"][kalem]
+                    github_a_kaydet("butce.json", butce_verisi)
+                    st.rerun()
             with c_item:
                 st.text_input(
                     "Kalem",
@@ -580,6 +592,40 @@ elif sayfa == "Bütçe Yönetimi":
             }
             bilgi_toplam += float(val)
         st.info(f"Aylık Sabit Giderler Toplamı (Bilgi): ₺{bilgi_toplam:,.2f}")
+
+        gelecek_12_ay = []
+        simdi = datetime.now()
+        for i in range(12):
+            yil = simdi.year + ((simdi.month - 1 + i) // 12)
+            ay = ((simdi.month - 1 + i) % 12) + 1
+            referans = datetime(yil, ay, 15)
+            ay_toplam = 0.0
+
+            for kayit in butce_verisi["aylik_sabit_gider_bilgi"].values():
+                if not isinstance(kayit, dict):
+                    continue
+                tutar = float(kayit.get("tutar", 0.0))
+                bitis_tarihi = str(kayit.get("bitis_tarihi", "")).strip()
+                aktif = True
+                if bitis_tarihi:
+                    try:
+                        bitis = datetime.strptime(bitis_tarihi, "%Y-%m-%d")
+                        if bitis < referans:
+                            aktif = False
+                    except:
+                        aktif = True
+                if aktif:
+                    ay_toplam += tutar
+
+            gelecek_12_ay.append(
+                {"Ay": referans.strftime("%Y-%m"), "Aylık Sabit Gider (₺)": ay_toplam}
+            )
+
+        st.markdown("#### Önümüzdeki 12 Ay Sabit Gider Grafiği (Her Ayın 15'i)")
+        df_12 = pd.DataFrame(gelecek_12_ay)
+        fig_12 = px.bar(df_12, x="Ay", y="Aylık Sabit Gider (₺)")
+        fig_12.update_layout(xaxis_title="Ay", yaxis_title="Tutar (₺)")
+        st.plotly_chart(fig_12, use_container_width=True)
     with c2:
         st.subheader("Gider")
         st.write("**Yeni Gider Kalemi Ekle/Güncelle**")
@@ -613,7 +659,14 @@ elif sayfa == "Bütçe Yönetimi":
         def but_ciz(b, a):
             t = 0
             st.write(f"**{b}**")
-            for n, v in butce_verisi["giderler"].get(a, {}).items():
+            for n in list(butce_verisi["giderler"].get(a, {}).keys()):
+                c_del, c_val = st.columns([0.2, 1.8])
+                with c_del:
+                    if st.button("🔴➖", key=f"sil_{a}_{n}"):
+                        del butce_verisi["giderler"][a][n]
+                        github_a_kaydet("butce.json", butce_verisi)
+                        st.rerun()
+                v = butce_verisi["giderler"][a][n]
                 if isinstance(v, dict):
                     v = float(
                         v.get(
@@ -621,9 +674,10 @@ elif sayfa == "Bütçe Yönetimi":
                             v.get("tutar", sum(v.get("duzenli_odemeler", {}).values())),
                         )
                     )
-                butce_verisi["giderler"][a][n] = st.number_input(
-                    f"{n}", value=float(v), key=f"v_{a}_{n}"
-                )
+                with c_val:
+                    butce_verisi["giderler"][a][n] = st.number_input(
+                        f"{n}", value=float(v), key=f"v_{a}_{n}"
+                    )
                 t += butce_verisi["giderler"][a][n]
             return t
 
