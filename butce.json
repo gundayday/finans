@@ -5,31 +5,11 @@
   },
   "giderler": {
     "Kredi Kartlari": {
-      "Vak\u0131f Kredi Kart\u0131": {
-        "kart_toplami": 0.0,
-        "manuel_toplam": false,
-        "duzenli_odemeler": {}
-      },
-      "Vak\u0131f KMH": {
-        "kart_toplami": 994.98,
-        "manuel_toplam": true,
-        "duzenli_odemeler": {}
-      },
-      "Enpara Kredi Kart\u0131": {
-        "kart_toplami": 22081.63,
-        "manuel_toplam": true,
-        "duzenli_odemeler": {}
-      },
-      "Enpara KMH": {
-        "kart_toplami": 36780.28,
-        "manuel_toplam": true,
-        "duzenli_odemeler": {}
-      },
-      "Garanti Shop Miles Kredi Kart\u0131": {
-        "kart_toplami": 70979.47,
-        "manuel_toplam": true,
-        "duzenli_odemeler": {}
-      }
+      "Vak\u0131f Kredi Kart\u0131": 0.0,
+      "Vak\u0131f KMH": 994.98,
+      "Enpara Kredi Kart\u0131": 22081.63,
+      "Enpara KMH": 36780.28,
+      "Garanti Shop Miles Kredi Kart\u0131": 70979.47
     },
     "Diger Borclar": {
       "B\u00f6l\u00fck Aidat": 0.0,
@@ -39,6 +19,12 @@
       "Vak\u0131f Kredi (15.05.26)": 2118.49,
       "Ziraat Ev Kredi (17.11.2027)": 2055.34,
       "Garanti Ev Kredi (15.08.2030)": 62266.96
+    }
+  },
+  "aylik_sabit_gider_bilgi": {
+    "Ajet": {
+      "tutar": 772.6,
+      "bitis_tarihi": "2026-04-20"
     }
   }
 }
