@@ -616,11 +616,8 @@ elif sayfa == "Bütçe Yönetimi":
         ),
         use_container_width=True,
     )
-    if st.button("💾 BÜTÇEYİ KAYDET", key="butce_kaydet_btn"):
-        github_a_kaydet("butce.json", butce_verisi)
-        st.success("Bütçe kaydedildi.")
-
     if st.button("💾 ARŞİVLE"):
+        github_a_kaydet("butce.json", butce_verisi)
         b_k = {
             "tarih": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "GELİR (TL)": f"₺{t_gel:,.0f}",
