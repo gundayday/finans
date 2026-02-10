@@ -68,6 +68,7 @@ def veri_yukle(dosya_adi, varsayilan):
             if dosya_adi == "butce.json":
                 giderler = data.setdefault("giderler", {})
                 kredi_kartlari = giderler.setdefault("Kredi Kartlari", {})
+                aylik_sabit_gider_bilgi = data.setdefault("aylik_sabit_gider_bilgi", {})
                 for kart_adi, kart_veri in list(kredi_kartlari.items()):
                     if isinstance(kart_veri, dict):
                         if "tutar" in kart_veri:
@@ -84,6 +85,11 @@ def veri_yukle(dosya_adi, varsayilan):
                             kredi_kartlari[kart_adi] = 0.0
                     else:
                         kredi_kartlari[kart_adi] = float(kart_veri)
+                for kalem, tutar in list(aylik_sabit_gider_bilgi.items()):
+                    try:
+                        aylik_sabit_gider_bilgi[kalem] = float(tutar)
+                    except:
+                        aylik_sabit_gider_bilgi[kalem] = 0.0
             return data
         except:
             return varsayilan
@@ -105,6 +111,7 @@ butce_verisi = veri_yukle(
     {
         "gelirler": {},
         "giderler": {"Kredi Kartlari": {}, "Diger Borclar": {}, "Sabit Giderler": {}},
+        "aylik_sabit_gider_bilgi": {},
     },
 )
 butce_arsivi = [b for b in veri_yukle("butce_arsiv.json", []) if "nan" not in str(b)]
@@ -473,6 +480,56 @@ elif sayfa == "Bütçe Yönetimi":
             )
         t_gel = sum(butce_verisi["gelirler"].values())
         st.success(f"Top: ₺{t_gel:,.2f}")
+
+        st.markdown("---")
+        st.subheader("Aylık Sabit Giderler (Bilgi Amaçlı)")
+        st.caption("Bu bölüm genel gelir-gider hesabına dahil edilmez.")
+        if "aylik_sabit_gider_bilgi" not in butce_verisi:
+            butce_verisi["aylik_sabit_gider_bilgi"] = {}
+
+        c_kalem, c_tutar = st.columns([2, 1])
+        with c_kalem:
+            yeni_sabit_kalem = st.text_input(
+                "Harcama Kalemi",
+                key="yeni_sabit_kalem",
+                placeholder="Örn: İnternet",
+            )
+        with c_tutar:
+            yeni_sabit_tutar = st.number_input(
+                "Tutar",
+                min_value=0.0,
+                value=0.0,
+                key="yeni_sabit_tutar",
+            )
+        if st.button("Sabit Gider Ekle/Güncelle", key="sabit_gider_ekle_btn") and yeni_sabit_kalem:
+            butce_verisi["aylik_sabit_gider_bilgi"][yeni_sabit_kalem] = float(
+                yeni_sabit_tutar
+            )
+            st.rerun()
+
+        bilgi_toplam = 0.0
+        st.markdown("**Harcama Kalemi** | **Tutar (₺)**")
+        for kalem in list(butce_verisi["aylik_sabit_gider_bilgi"].keys()):
+            c_item, c_val = st.columns([2, 1])
+            with c_item:
+                st.text_input(
+                    "Kalem",
+                    value=kalem,
+                    disabled=True,
+                    key=f"bilgi_kalem_{kalem}",
+                    label_visibility="collapsed",
+                )
+            with c_val:
+                val = st.number_input(
+                    "Tutar",
+                    min_value=0.0,
+                    value=float(butce_verisi["aylik_sabit_gider_bilgi"][kalem]),
+                    key=f"bilgi_tutar_{kalem}",
+                    label_visibility="collapsed",
+                )
+            butce_verisi["aylik_sabit_gider_bilgi"][kalem] = float(val)
+            bilgi_toplam += float(val)
+        st.info(f"Aylık Sabit Giderler Toplamı (Bilgi): ₺{bilgi_toplam:,.2f}")
     with c2:
         st.subheader("Gider")
 
