@@ -70,36 +70,20 @@ def veri_yukle(dosya_adi, varsayilan):
                 kredi_kartlari = giderler.setdefault("Kredi Kartlari", {})
                 for kart_adi, kart_veri in list(kredi_kartlari.items()):
                     if isinstance(kart_veri, dict):
-                        duzenli_odemeler = kart_veri.get("duzenli_odemeler", {})
-                        if not isinstance(duzenli_odemeler, dict):
-                            duzenli_odemeler = {}
-                        temiz_odemeler = {}
-                        for odeme_adi, odeme_tutar in duzenli_odemeler.items():
-                            try:
-                                temiz_odemeler[odeme_adi] = float(odeme_tutar)
-                            except:
-                                temiz_odemeler[odeme_adi] = 0.0
-                        if "tutar" in kart_veri and "kart_toplami" not in kart_veri:
-                            kart_toplami = float(kart_veri.get("tutar", 0.0))
-                            manuel_toplam = True
-                        else:
-                            kart_toplami = float(
-                                kart_veri.get(
-                                    "kart_toplami", sum(temiz_odemeler.values())
-                                )
+                        if "tutar" in kart_veri:
+                            kredi_kartlari[kart_adi] = float(kart_veri.get("tutar", 0.0))
+                        elif "kart_toplami" in kart_veri:
+                            kredi_kartlari[kart_adi] = float(
+                                kart_veri.get("kart_toplami", 0.0)
                             )
-                            manuel_toplam = bool(kart_veri.get("manuel_toplam", False))
-                        kredi_kartlari[kart_adi] = {
-                            "kart_toplami": kart_toplami,
-                            "manuel_toplam": manuel_toplam,
-                            "duzenli_odemeler": temiz_odemeler,
-                        }
+                        elif isinstance(kart_veri.get("duzenli_odemeler"), dict):
+                            kredi_kartlari[kart_adi] = float(
+                                sum(kart_veri["duzenli_odemeler"].values())
+                            )
+                        else:
+                            kredi_kartlari[kart_adi] = 0.0
                     else:
-                        kredi_kartlari[kart_adi] = {
-                            "kart_toplami": float(kart_veri),
-                            "manuel_toplam": True,
-                            "duzenli_odemeler": {},
-                        }
+                        kredi_kartlari[kart_adi] = float(kart_veri)
             return data
         except:
             return varsayilan
@@ -491,107 +475,18 @@ elif sayfa == "Bütçe Yönetimi":
         st.success(f"Top: ₺{t_gel:,.2f}")
     with c2:
         st.subheader("Gider")
-        st.write("**Kredi Kartları**")
-        if "Kredi Kartlari" not in butce_verisi["giderler"]:
-            butce_verisi["giderler"]["Kredi Kartlari"] = {}
-
-        yeni_kart_adi = st.text_input("Yeni Kart Adı", key="yeni_kart_adi")
-        if st.button("Kart Ekle", key="kart_ekle_btn") and yeni_kart_adi:
-            butce_verisi["giderler"]["Kredi Kartlari"][yeni_kart_adi] = {
-                "kart_toplami": 0.0,
-                "manuel_toplam": False,
-                "duzenli_odemeler": {},
-            }
-            github_a_kaydet("butce.json", butce_verisi)
-            st.rerun()
-
-        t_kk = 0
-        for kart_adi in list(butce_verisi["giderler"]["Kredi Kartlari"].keys()):
-            kart = butce_verisi["giderler"]["Kredi Kartlari"][kart_adi]
-            if not isinstance(kart, dict):
-                kart = {
-                    "kart_toplami": float(kart),
-                    "manuel_toplam": True,
-                    "duzenli_odemeler": {},
-                }
-                butce_verisi["giderler"]["Kredi Kartlari"][kart_adi] = kart
-            kart.setdefault("duzenli_odemeler", {})
-            kart.setdefault("manuel_toplam", False)
-            st.markdown(f"#### 💳 {kart_adi}")
-            st.markdown("**Harcama Kalemi** | **Tutar (₺)**")
-
-            auto_toplam = 0.0
-            for odeme_adi in list(kart["duzenli_odemeler"].keys()):
-                c_item, c_tutar = st.columns([2, 1])
-                with c_item:
-                    st.text_input(
-                        "Harcama Kalemi",
-                        value=odeme_adi,
-                        disabled=True,
-                        key=f"odeme_ad_{kart_adi}_{odeme_adi}",
-                        label_visibility="collapsed",
-                    )
-                with c_tutar:
-                    odeme_tutar = st.number_input(
-                        "Tutar",
-                        min_value=0.0,
-                        value=float(kart["duzenli_odemeler"][odeme_adi]),
-                        key=f"kk_{kart_adi}_{odeme_adi}",
-                        label_visibility="collapsed",
-                    )
-                kart["duzenli_odemeler"][odeme_adi] = float(odeme_tutar)
-                auto_toplam += float(odeme_tutar)
-
-            e_item, e_tutar = st.columns([2, 1])
-            with e_item:
-                yeni_odeme_adi = st.text_input(
-                    "Harcama Kalemi",
-                    key=f"yeni_odeme_ad_{kart_adi}",
-                    label_visibility="collapsed",
-                    placeholder="Yeni harcama kalemi",
-                )
-            with e_tutar:
-                yeni_odeme_tutar = st.number_input(
-                    "Tutar",
-                    min_value=0.0,
-                    value=0.0,
-                    key=f"yeni_odeme_tutar_{kart_adi}",
-                    label_visibility="collapsed",
-                )
-            if st.button("Kalem Ekle/Güncelle", key=f"odeme_ekle_{kart_adi}") and yeni_odeme_adi:
-                kart["duzenli_odemeler"][yeni_odeme_adi] = float(yeni_odeme_tutar)
-                st.rerun()
-
-            kart["manuel_toplam"] = st.checkbox(
-                f"{kart_adi} toplamını elle gir",
-                value=bool(kart.get("manuel_toplam", False)),
-                key=f"manuel_toplam_{kart_adi}",
-            )
-            if kart["manuel_toplam"]:
-                kart["kart_toplami"] = st.number_input(
-                    f"{kart_adi} Kart Toplamı (₺)",
-                    min_value=0.0,
-                    value=float(kart.get("kart_toplami", auto_toplam)),
-                    key=f"kart_toplam_{kart_adi}",
-                )
-            else:
-                kart["kart_toplami"] = float(auto_toplam)
-
-            st.info(f"{kart_adi} Toplam Gider: ₺{kart['kart_toplami']:,.2f}")
-            t_kk += float(kart.get("kart_toplami", 0.0))
-            if st.button("Kartı Sil", key=f"kart_sil_{kart_adi}"):
-                del butce_verisi["giderler"]["Kredi Kartlari"][kart_adi]
-                st.rerun()
-            st.markdown("---")
-
-        st.warning(f"Kredi Kartları Toplamı: ₺{t_kk:,.2f}")
 
         def but_ciz(b, a):
             t = 0
             st.write(f"**{b}**")
             for n, v in butce_verisi["giderler"].get(a, {}).items():
                 if isinstance(v, dict):
-                    v = float(v.get("kart_toplami", v.get("tutar", 0.0)))
+                    v = float(
+                        v.get(
+                            "kart_toplami",
+                            v.get("tutar", sum(v.get("duzenli_odemeler", {}).values())),
+                        )
+                    )
                 butce_verisi["giderler"][a][n] = st.number_input(
                     f"{n}", value=float(v), key=f"v_{a}_{n}"
                 )
@@ -599,7 +494,7 @@ elif sayfa == "Bütçe Yönetimi":
             return t
 
         t_gid = (
-            t_kk
+            but_ciz("Kartlar", "Kredi Kartlari")
             + but_ciz("Sabit", "Sabit Giderler")
             + but_ciz("Diğer", "Diger Borclar")
         )
