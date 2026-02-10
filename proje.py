@@ -151,6 +151,11 @@ def fmt_yuzde(suan, eski):
 
 
 def renk_stili(val):
+    if isinstance(val, str):
+        try:
+            val = temizle_sayi(val)
+        except:
+            return ""
     if isinstance(val, (int, float)):
         color = "red" if val < 0 else "green" if val > 0 else "white"
         return f"color: {color}"
@@ -642,13 +647,25 @@ elif sayfa == "Bütçe Yönetimi":
     )
     if st.button("💾 ARŞİVLE"):
         github_a_kaydet("butce.json", butce_verisi)
+        net_usd = net / usd_val if usd_val else 0.0
+        onceki_net_usd = None
+        if butce_arsivi:
+            try:
+                onceki_net_usd = temizle_sayi(butce_arsivi[-1].get("NET ($)", 0))
+            except:
+                onceki_net_usd = None
+        if onceki_net_usd is None or onceki_net_usd == 0:
+            degisim_yuzde = 0.0
+        else:
+            degisim_yuzde = ((net_usd - onceki_net_usd) / abs(onceki_net_usd)) * 100
+
         b_k = {
             "tarih": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "GELİR (TL)": f"₺{t_gel:,.0f}",
             "GİDER (TL)": f"₺{t_gid:,.0f}",
             "NET (TL)": f"₺{net:,.0f}",
-            "NET ($)": f"${net/usd_val:,.0f}",
-            "Değişim %": "0.00%",
+            "NET ($)": f"${net_usd:,.0f}",
+            "Değişim %": f"{degisim_yuzde:+.2f}%",
         }
         butce_arsivi.append(b_k)
         github_a_kaydet("butce_arsiv.json", butce_arsivi)
@@ -660,7 +677,11 @@ elif sayfa == "Bütçe Arşivi":
     if not butce_arsivi:
         st.info("Yok.")
     else:
-        st.dataframe(pd.DataFrame(butce_arsivi[::-1]), use_container_width=True)
+        df_ba = pd.DataFrame(butce_arsivi[::-1])
+        st.dataframe(
+            df_ba.style.applymap(renk_stili, subset=["NET (TL)", "NET ($)", "Değişim %"]),
+            use_container_width=True,
+        )
 
 # SIDEBAR VARLIK EKLEME
 with st.sidebar.expander("➕ Varlık Yönetimi & Maliyet"):
