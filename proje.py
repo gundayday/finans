@@ -5,6 +5,7 @@ import requests
 import yfinance as yf
 from bs4 import BeautifulSoup
 import os
+import html
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 import plotly.express as px
@@ -441,6 +442,20 @@ if sayfa == "Ana Panel":
                 ).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]),
                 use_container_width=True,
             )
+            st.caption("Varlık Bazlı Güncel Özet (🛈 üzerine gel)")
+            for satir in liste:
+                varlik_kodu = str(satir["Varlık"]).lower()
+                deg_usd = float(satir["Değ% ($)"])
+                ozet = degisim_tooltip_olustur(varlik_kodu, tip, deg_usd)
+                guvenli_ozet = html.escape(ozet, quote=True)
+                st.markdown(
+                    f"<div style='font-size:0.84rem; margin:2px 0;'>"
+                    f"<b>{satir['Varlık']}</b> "
+                    f"<span title=\"{guvenli_ozet}\" "
+                    f"style='color:#60a5fa; cursor:help; border:1px solid #334155; border-radius:10px; padding:0 6px;'>🛈</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
         return {"tl": t_tl, "usd": t_usd, "e_tl": t_e_tl, "e_usd": t_e_usd}
 
