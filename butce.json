@@ -5,11 +5,31 @@
   },
   "giderler": {
     "Kredi Kartlari": {
-      "Vak\u0131f Kredi Kart\u0131": 88531.09,
-      "Vak\u0131f KMH": 994.98,
-      "Enpara Kredi Kart\u0131": 22081.63,
-      "Enpara KMH": 36780.28,
-      "Garanti Shop Miles Kredi Kart\u0131": 70979.47
+      "Vak\u0131f Kredi Kart\u0131": {
+        "kart_toplami": 0.0,
+        "manuel_toplam": false,
+        "duzenli_odemeler": {}
+      },
+      "Vak\u0131f KMH": {
+        "kart_toplami": 994.98,
+        "manuel_toplam": true,
+        "duzenli_odemeler": {}
+      },
+      "Enpara Kredi Kart\u0131": {
+        "kart_toplami": 22081.63,
+        "manuel_toplam": true,
+        "duzenli_odemeler": {}
+      },
+      "Enpara KMH": {
+        "kart_toplami": 36780.28,
+        "manuel_toplam": true,
+        "duzenli_odemeler": {}
+      },
+      "Garanti Shop Miles Kredi Kart\u0131": {
+        "kart_toplami": 70979.47,
+        "manuel_toplam": true,
+        "duzenli_odemeler": {}
+      }
     },
     "Diger Borclar": {
       "B\u00f6l\u00fck Aidat": 0.0,
