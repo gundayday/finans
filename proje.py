@@ -65,6 +65,41 @@ def veri_yukle(dosya_adi, varsayilan):
                                 "miktar": data[kat][vid],
                                 "maliyet_usd": 0.0,
                             }
+            if dosya_adi == "butce.json":
+                giderler = data.setdefault("giderler", {})
+                kredi_kartlari = giderler.setdefault("Kredi Kartlari", {})
+                for kart_adi, kart_veri in list(kredi_kartlari.items()):
+                    if isinstance(kart_veri, dict):
+                        duzenli_odemeler = kart_veri.get("duzenli_odemeler", {})
+                        if not isinstance(duzenli_odemeler, dict):
+                            duzenli_odemeler = {}
+                        temiz_odemeler = {}
+                        for odeme_adi, odeme_tutar in duzenli_odemeler.items():
+                            try:
+                                temiz_odemeler[odeme_adi] = float(odeme_tutar)
+                            except:
+                                temiz_odemeler[odeme_adi] = 0.0
+                        if "tutar" in kart_veri and "kart_toplami" not in kart_veri:
+                            kart_toplami = float(kart_veri.get("tutar", 0.0))
+                            manuel_toplam = True
+                        else:
+                            kart_toplami = float(
+                                kart_veri.get(
+                                    "kart_toplami", sum(temiz_odemeler.values())
+                                )
+                            )
+                            manuel_toplam = bool(kart_veri.get("manuel_toplam", False))
+                        kredi_kartlari[kart_adi] = {
+                            "kart_toplami": kart_toplami,
+                            "manuel_toplam": manuel_toplam,
+                            "duzenli_odemeler": temiz_odemeler,
+                        }
+                    else:
+                        kredi_kartlari[kart_adi] = {
+                            "kart_toplami": float(kart_veri),
+                            "manuel_toplam": True,
+                            "duzenli_odemeler": {},
+                        }
             return data
         except:
             return varsayilan
@@ -456,11 +491,93 @@ elif sayfa == "Bütçe Yönetimi":
         st.success(f"Top: ₺{t_gel:,.2f}")
     with c2:
         st.subheader("Gider")
+        st.write("**Kredi Kartları**")
+        if "Kredi Kartlari" not in butce_verisi["giderler"]:
+            butce_verisi["giderler"]["Kredi Kartlari"] = {}
+
+        yeni_kart_adi = st.text_input("Yeni Kart Adı", key="yeni_kart_adi")
+        if st.button("Kart Ekle", key="kart_ekle_btn") and yeni_kart_adi:
+            butce_verisi["giderler"]["Kredi Kartlari"][yeni_kart_adi] = {
+                "kart_toplami": 0.0,
+                "manuel_toplam": False,
+                "duzenli_odemeler": {},
+            }
+            github_a_kaydet("butce.json", butce_verisi)
+            st.rerun()
+
+        t_kk = 0
+        for kart_adi in list(butce_verisi["giderler"]["Kredi Kartlari"].keys()):
+            kart = butce_verisi["giderler"]["Kredi Kartlari"][kart_adi]
+            if not isinstance(kart, dict):
+                kart = {
+                    "kart_toplami": float(kart),
+                    "manuel_toplam": True,
+                    "duzenli_odemeler": {},
+                }
+                butce_verisi["giderler"]["Kredi Kartlari"][kart_adi] = kart
+            kart.setdefault("duzenli_odemeler", {})
+            kart.setdefault("manuel_toplam", False)
+
+            with st.expander(f"💳 {kart_adi}", expanded=False):
+                yeni_odeme_adi = st.text_input(
+                    f"{kart_adi} - Yeni Düzenli Ödeme", key=f"yeni_odeme_ad_{kart_adi}"
+                )
+                yeni_odeme_tutar = st.number_input(
+                    f"{kart_adi} - Yeni Ödeme Tutarı",
+                    min_value=0.0,
+                    value=0.0,
+                    key=f"yeni_odeme_tutar_{kart_adi}",
+                )
+                if (
+                    st.button("Ödeme Ekle/Güncelle", key=f"odeme_ekle_{kart_adi}")
+                    and yeni_odeme_adi
+                ):
+                    kart["duzenli_odemeler"][yeni_odeme_adi] = float(yeni_odeme_tutar)
+                    st.rerun()
+
+                auto_toplam = 0.0
+                for odeme_adi in list(kart["duzenli_odemeler"].keys()):
+                    odeme_tutar = st.number_input(
+                        f"{odeme_adi} (₺)",
+                        min_value=0.0,
+                        value=float(kart["duzenli_odemeler"][odeme_adi]),
+                        key=f"kk_{kart_adi}_{odeme_adi}",
+                    )
+                    kart["duzenli_odemeler"][odeme_adi] = float(odeme_tutar)
+                    auto_toplam += float(odeme_tutar)
+                    if st.button("Bu Ödemeyi Sil", key=f"sil_{kart_adi}_{odeme_adi}"):
+                        del kart["duzenli_odemeler"][odeme_adi]
+                        st.rerun()
+
+                kart["manuel_toplam"] = st.checkbox(
+                    "Kart Toplamını Elle Gir",
+                    value=bool(kart.get("manuel_toplam", False)),
+                    key=f"manuel_toplam_{kart_adi}",
+                )
+                if kart["manuel_toplam"]:
+                    kart["kart_toplami"] = st.number_input(
+                        "Kart Toplamı (₺)",
+                        min_value=0.0,
+                        value=float(kart.get("kart_toplami", auto_toplam)),
+                        key=f"kart_toplam_{kart_adi}",
+                    )
+                else:
+                    kart["kart_toplami"] = float(auto_toplam)
+                    st.info(f"Otomatik Kart Toplamı: ₺{auto_toplam:,.2f}")
+
+                t_kk += float(kart.get("kart_toplami", 0.0))
+                if st.button("Kartı Sil", key=f"kart_sil_{kart_adi}"):
+                    del butce_verisi["giderler"]["Kredi Kartlari"][kart_adi]
+                    st.rerun()
+
+        st.warning(f"Kredi Kartları Toplamı: ₺{t_kk:,.2f}")
 
         def but_ciz(b, a):
             t = 0
             st.write(f"**{b}**")
             for n, v in butce_verisi["giderler"].get(a, {}).items():
+                if isinstance(v, dict):
+                    v = float(v.get("kart_toplami", v.get("tutar", 0.0)))
                 butce_verisi["giderler"][a][n] = st.number_input(
                     f"{n}", value=float(v), key=f"v_{a}_{n}"
                 )
@@ -468,7 +585,7 @@ elif sayfa == "Bütçe Yönetimi":
             return t
 
         t_gid = (
-            but_ciz("Kartlar", "Kredi Kartlari")
+            t_kk
             + but_ciz("Sabit", "Sabit Giderler")
             + but_ciz("Diğer", "Diger Borclar")
         )
@@ -485,6 +602,9 @@ elif sayfa == "Bütçe Yönetimi":
         ),
         use_container_width=True,
     )
+    if st.button("💾 BÜTÇEYİ KAYDET", key="butce_kaydet_btn"):
+        github_a_kaydet("butce.json", butce_verisi)
+        st.success("Bütçe kaydedildi.")
 
     if st.button("💾 ARŞİVLE"):
         b_k = {
