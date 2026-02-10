@@ -112,15 +112,44 @@ st.set_page_config(page_title="Finans Karargahı", layout="wide")
 st.markdown(
     """
     <style>
+    .stApp {
+        --ui-font-sm: 0.88rem;
+    }
+    div[data-testid="stMarkdown"] p,
+    div[data-testid="stMarkdown"] li,
+    div[data-testid="stCaptionContainer"] {
+        font-size: var(--ui-font-sm);
+    }
     div[data-testid="stButton"] > button {
         border-radius: 8px;
+        min-height: 1.65rem;
+        padding: 0 0.45rem;
+        font-size: 0.82rem;
     }
     div[data-testid="stButton"] > button[aria-label="−"] {
-        color: #ff4b4b;
-        border: 1px solid #ff4b4b;
-        padding: 0 0.35rem;
-        min-height: 1.55rem;
+        color: #c53a3a;
+        border: 1px solid #c53a3a;
+        background: transparent;
+        padding: 0 0.28rem;
+        min-height: 1.45rem;
         line-height: 1;
+    }
+    div[data-testid="stButton"] > button[aria-label="−"]:hover {
+        color: #ffffff;
+        background: #e3342f;
+        border-color: #e3342f;
+    }
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stNumberInput"] input {
+        font-size: 0.84rem;
+        min-height: 2.05rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+    }
+    div[data-testid="stTextInput"] label,
+    div[data-testid="stNumberInput"] label,
+    div[data-testid="stSelectbox"] label {
+        font-size: 0.78rem;
     }
     </style>
     """,
@@ -568,12 +597,18 @@ elif sayfa == "Bütçe Yönetimi":
 
         bilgi_toplam = 0.0
         st.markdown("**Sil** | **Harcama Kalemi** | **Tutar (₺)** | **Son Bulma Tarihi**")
-        for kalem in list(butce_verisi["aylik_sabit_gider_bilgi"].keys()):
-            kayit = butce_verisi["aylik_sabit_gider_bilgi"][kalem]
+        sirali_kalemler = sorted(
+            butce_verisi["aylik_sabit_gider_bilgi"].items(),
+            key=lambda kv: float(
+                kv[1].get("tutar", 0.0) if isinstance(kv[1], dict) else kv[1]
+            ),
+            reverse=True,
+        )
+        for kalem, kayit in sirali_kalemler:
             if not isinstance(kayit, dict):
                 kayit = {"tutar": float(kayit), "bitis_tarihi": ""}
                 butce_verisi["aylik_sabit_gider_bilgi"][kalem] = kayit
-            c_del, c_item, c_val, c_end = st.columns([0.2, 2, 1, 1])
+            c_del, c_item, c_val, c_end = st.columns([0.2, 2.05, 0.95, 1.25])
             with c_del:
                 if st.button("−", key=f"sil_bilgi_{kalem}", help="Kalemi sil"):
                     del butce_verisi["aylik_sabit_gider_bilgi"][kalem]
