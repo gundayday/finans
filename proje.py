@@ -6,6 +6,7 @@ import yfinance as yf
 from bs4 import BeautifulSoup
 import os
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 import plotly.express as px
 import base64
 import numpy as np
@@ -208,6 +209,69 @@ def renk_stili(val):
     return ""
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def gunluk_haber_maddeleri(sorgu):
+    try:
+        res = requests.get(
+            "https://news.google.com/rss/search",
+            params={
+                "q": f"{sorgu} when:1d",
+                "hl": "tr",
+                "gl": "TR",
+                "ceid": "TR:tr",
+            },
+            timeout=6,
+        )
+        soup = BeautifulSoup(res.content, "html.parser")
+        items = []
+        for item in soup.find_all("item")[:2]:
+            baslik = item.title.text.strip() if item.title else ""
+            kaynak = item.source.text.strip() if item.source else "Haber"
+            tarih_raw = item.pubDate.text.strip() if item.pubDate else ""
+            saat = ""
+            if tarih_raw:
+                try:
+                    dt = parsedate_to_datetime(tarih_raw).astimezone()
+                    saat = dt.strftime("%d.%m %H:%M")
+                except:
+                    saat = ""
+            if baslik:
+                items.append({"baslik": baslik, "kaynak": kaynak, "saat": saat})
+        return items
+    except:
+        return []
+
+
+def varlik_haber_sorgusu(vid, tip):
+    if tip == "kripto":
+        return f"{vid} kripto"
+    if tip == "hisse":
+        kod = vid.split(".")[0].upper()
+        return f"{kod} BIST hisse" if ".is" in vid.lower() else f"{kod} stock"
+    return {
+        "dolar": "USDTRY döviz kuru",
+        "euro": "EURTRY döviz kuru",
+        "sterlin": "GBPTRY döviz kuru",
+        "gram_altin": "gram altın",
+    }.get(vid.lower(), vid)
+
+
+def degisim_tooltip_olustur(vid, tip, deg_usd):
+    yon = "yükseliş" if deg_usd >= 0 else "düşüş"
+    sorgu = varlik_haber_sorgusu(vid, tip)
+    haberler = gunluk_haber_maddeleri(sorgu)
+    if not haberler:
+        return (
+            f"Son 24 saatte {vid.upper()} için %{deg_usd:+.2f} ({yon}) hareket var. "
+            "Güncel haber akışı alınamadı, piyasa genel oynaklığı etkili olabilir."
+        )
+    cumleler = [f"Son 24 saatte {vid.upper()} %{deg_usd:+.2f} ({yon}) hareket etti."]
+    for h in haberler[:2]:
+        zaman = f" ({h['saat']})" if h["saat"] else ""
+        cumleler.append(f"{h['kaynak']}{zaman}: {h['baslik']}")
+    return " ".join(cumleler)
+
+
 def doviz_cek():
     try:
         res = requests.get("https://www.doviz.com/", timeout=5)
@@ -289,6 +353,7 @@ if sayfa == "Ana Panel":
     def ciz_tablo(kat, varliklar, kaynak, tip):
         # BU KISIM ARTIK DOĞRU GİRİNTİLENMİŞ DURUMDA
         liste = []
+        tooltip_list = []
         t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
         for vid, data in varliklar.items():
             mik, mal_usd = data["miktar"], data["maliyet_usd"]
@@ -358,12 +423,21 @@ if sayfa == "Ana Panel":
                     ),
                 }
             )
+            tooltip_list.append(
+                degisim_tooltip_olustur(
+                    vid,
+                    tip,
+                    fmt_yuzde(f_usd, gecmis_fiyatlar.get(f"{vid}_usd", f_usd)),
+                )
+            )
             gecmis_fiyatlar[f"{vid}_tl"], gecmis_fiyatlar[f"{vid}_usd"] = f_tl, f_usd
 
         st.subheader(kat.replace("_", " ").title())
         if liste:
             df = pd.DataFrame(liste)
-            st.dataframe(
+            tooltip_df = pd.DataFrame("", index=df.index, columns=df.columns)
+            tooltip_df["Değ% ($)"] = tooltip_list
+            styled = (
                 df.style.format(
                     {
                         "Maliyet ($)": "${:,.2f}",
@@ -374,7 +448,12 @@ if sayfa == "Ana Panel":
                         "Değ% (TL)": "{:+.2f}%",
                         "Değ% ($)": "{:+.2f}%",
                     }
-                ).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]),
+                )
+                .applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"])
+                .set_tooltips(tooltip_df)
+            )
+            st.dataframe(
+                styled,
                 use_container_width=True,
             )
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
