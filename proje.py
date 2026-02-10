@@ -353,7 +353,6 @@ if sayfa == "Ana Panel":
     def ciz_tablo(kat, varliklar, kaynak, tip):
         # BU KISIM ARTIK DOĞRU GİRİNTİLENMİŞ DURUMDA
         liste = []
-        tooltip_list = []
         t_tl, t_usd, t_e_tl, t_e_usd = 0, 0, 0, 0
         for vid, data in varliklar.items():
             mik, mal_usd = data["miktar"], data["maliyet_usd"]
@@ -423,21 +422,12 @@ if sayfa == "Ana Panel":
                     ),
                 }
             )
-            tooltip_list.append(
-                degisim_tooltip_olustur(
-                    vid,
-                    tip,
-                    fmt_yuzde(f_usd, gecmis_fiyatlar.get(f"{vid}_usd", f_usd)),
-                )
-            )
             gecmis_fiyatlar[f"{vid}_tl"], gecmis_fiyatlar[f"{vid}_usd"] = f_tl, f_usd
 
         st.subheader(kat.replace("_", " ").title())
         if liste:
             df = pd.DataFrame(liste)
-            tooltip_df = pd.DataFrame("", index=df.index, columns=df.columns)
-            tooltip_df["Değ% ($)"] = tooltip_list
-            styled = (
+            st.dataframe(
                 df.style.format(
                     {
                         "Maliyet ($)": "${:,.2f}",
@@ -448,12 +438,7 @@ if sayfa == "Ana Panel":
                         "Değ% (TL)": "{:+.2f}%",
                         "Değ% ($)": "{:+.2f}%",
                     }
-                )
-                .applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"])
-                .set_tooltips(tooltip_df)
-            )
-            st.dataframe(
-                styled,
+                ).applymap(renk_stili, subset=["K/Z %", "Değ% (TL)", "Değ% ($)"]),
                 use_container_width=True,
             )
             st.info(f"**Ara Toplam:** ₺{t_tl:,.2f} | ${t_usd:,.2f}")
