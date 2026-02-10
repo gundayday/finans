@@ -85,11 +85,23 @@ def veri_yukle(dosya_adi, varsayilan):
                             kredi_kartlari[kart_adi] = 0.0
                     else:
                         kredi_kartlari[kart_adi] = float(kart_veri)
-                for kalem, tutar in list(aylik_sabit_gider_bilgi.items()):
-                    try:
-                        aylik_sabit_gider_bilgi[kalem] = float(tutar)
-                    except:
-                        aylik_sabit_gider_bilgi[kalem] = 0.0
+                for kalem, kayit in list(aylik_sabit_gider_bilgi.items()):
+                    if isinstance(kayit, dict):
+                        try:
+                            tutar = float(kayit.get("tutar", 0.0))
+                        except:
+                            tutar = 0.0
+                        bitis_tarihi = str(kayit.get("bitis_tarihi", "")).strip()
+                    else:
+                        try:
+                            tutar = float(kayit)
+                        except:
+                            tutar = 0.0
+                        bitis_tarihi = ""
+                    aylik_sabit_gider_bilgi[kalem] = {
+                        "tutar": tutar,
+                        "bitis_tarihi": bitis_tarihi,
+                    }
             return data
         except:
             return varsayilan
@@ -487,7 +499,7 @@ elif sayfa == "Bütçe Yönetimi":
         if "aylik_sabit_gider_bilgi" not in butce_verisi:
             butce_verisi["aylik_sabit_gider_bilgi"] = {}
 
-        c_kalem, c_tutar = st.columns([2, 1])
+        c_kalem, c_tutar, c_tarih = st.columns([2, 1, 1])
         with c_kalem:
             yeni_sabit_kalem = st.text_input(
                 "Harcama Kalemi",
@@ -501,16 +513,38 @@ elif sayfa == "Bütçe Yönetimi":
                 value=0.0,
                 key="yeni_sabit_tutar",
             )
-        if st.button("Sabit Gider Ekle/Güncelle", key="sabit_gider_ekle_btn") and yeni_sabit_kalem:
-            butce_verisi["aylik_sabit_gider_bilgi"][yeni_sabit_kalem] = float(
-                yeni_sabit_tutar
+        with c_tarih:
+            yeni_sabit_bitis = st.text_input(
+                "Son Bulma Tarihi (YYYY-MM-DD)",
+                key="yeni_sabit_bitis",
+                placeholder="Örn: 2026-12-31",
             )
-            st.rerun()
+        if (
+            st.button("Sabit Gider Ekle/Güncelle", key="sabit_gider_ekle_btn")
+            and yeni_sabit_kalem
+        ):
+            bitis_tarihi = yeni_sabit_bitis.strip()
+            if bitis_tarihi:
+                try:
+                    datetime.strptime(bitis_tarihi, "%Y-%m-%d")
+                except:
+                    st.error("Son bulma tarihi formatı hatalı. YYYY-MM-DD gir.")
+                    bitis_tarihi = ""
+            butce_verisi["aylik_sabit_gider_bilgi"][yeni_sabit_kalem] = {
+                "tutar": float(yeni_sabit_tutar),
+                "bitis_tarihi": bitis_tarihi,
+            }
+            github_a_kaydet("butce.json", butce_verisi)
+            st.success(f"{yeni_sabit_kalem} listeye eklendi/güncellendi.")
 
         bilgi_toplam = 0.0
-        st.markdown("**Harcama Kalemi** | **Tutar (₺)**")
+        st.markdown("**Harcama Kalemi** | **Tutar (₺)** | **Son Bulma Tarihi**")
         for kalem in list(butce_verisi["aylik_sabit_gider_bilgi"].keys()):
-            c_item, c_val = st.columns([2, 1])
+            kayit = butce_verisi["aylik_sabit_gider_bilgi"][kalem]
+            if not isinstance(kayit, dict):
+                kayit = {"tutar": float(kayit), "bitis_tarihi": ""}
+                butce_verisi["aylik_sabit_gider_bilgi"][kalem] = kayit
+            c_item, c_val, c_end = st.columns([2, 1, 1])
             with c_item:
                 st.text_input(
                     "Kalem",
@@ -523,11 +557,22 @@ elif sayfa == "Bütçe Yönetimi":
                 val = st.number_input(
                     "Tutar",
                     min_value=0.0,
-                    value=float(butce_verisi["aylik_sabit_gider_bilgi"][kalem]),
+                    value=float(kayit.get("tutar", 0.0)),
                     key=f"bilgi_tutar_{kalem}",
                     label_visibility="collapsed",
                 )
-            butce_verisi["aylik_sabit_gider_bilgi"][kalem] = float(val)
+            with c_end:
+                end_date = st.text_input(
+                    "Son Bulma Tarihi",
+                    value=str(kayit.get("bitis_tarihi", "")),
+                    key=f"bilgi_bitis_{kalem}",
+                    label_visibility="collapsed",
+                    placeholder="YYYY-MM-DD",
+                ).strip()
+            butce_verisi["aylik_sabit_gider_bilgi"][kalem] = {
+                "tutar": float(val),
+                "bitis_tarihi": end_date,
+            }
             bilgi_toplam += float(val)
         st.info(f"Aylık Sabit Giderler Toplamı (Bilgi): ₺{bilgi_toplam:,.2f}")
     with c2:
