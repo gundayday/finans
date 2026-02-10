@@ -514,15 +514,32 @@ elif sayfa == "Geçmiş Performans":
     if not gecmis_kayitlar:
         st.info("Yok.")
     else:
-        df_a = pd.DataFrame(gecmis_kayitlar[::-1])
-        df_a["Deg_TL_Num"] = df_a["Değişim (TL)"].apply(
-            lambda x: float(str(x).replace("%", "")) if x else 0
+        df_a = pd.DataFrame(gecmis_kayitlar)
+        df_a["Toplam_TL_Num"] = df_a["Toplam (TL)"].apply(temizle_sayi)
+        df_a["Toplam_USD_Num"] = df_a["Toplam ($)"].apply(temizle_sayi)
+
+        onceki_tl = df_a["Toplam_TL_Num"].shift(1)
+        onceki_usd = df_a["Toplam_USD_Num"].shift(1)
+
+        df_a["Deg_TL_Hesap"] = np.where(
+            onceki_tl.abs() > 0,
+            ((df_a["Toplam_TL_Num"] - onceki_tl) / onceki_tl.abs()) * 100,
+            0.0,
         )
-        df_a["Deg_USD_Num"] = df_a["Değişim ($)"].apply(
-            lambda x: float(str(x).replace("%", "")) if x else 0
+        df_a["Deg_USD_Hesap"] = np.where(
+            onceki_usd.abs() > 0,
+            ((df_a["Toplam_USD_Num"] - onceki_usd) / onceki_usd.abs()) * 100,
+            0.0,
+        )
+
+        df_a["Değişim (TL)"] = df_a["Deg_TL_Hesap"].apply(lambda x: f"{x:+.2f}%")
+        df_a["Değişim ($)"] = df_a["Deg_USD_Hesap"].apply(lambda x: f"{x:+.2f}%")
+
+        gosterim_df = df_a.iloc[::-1].drop(
+            columns=["Toplam_TL_Num", "Toplam_USD_Num", "Deg_TL_Hesap", "Deg_USD_Hesap"]
         )
         st.dataframe(
-            df_a.style.applymap(renk_stili, subset=["Deg_TL_Num", "Deg_USD_Num"]),
+            gosterim_df.style.applymap(renk_stili, subset=["Değişim (TL)", "Değişim ($)"]),
             use_container_width=True,
         )
 
