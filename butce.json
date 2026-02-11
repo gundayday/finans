@@ -85,6 +85,10 @@
     "Ziraat Ev Kredi ": {
       "tutar": 2055.34,
       "bitis_tarihi": "2027-11-17"
+    },
+    "Turkcell Telefon": {
+      "tutar": 700.0,
+      "bitis_tarihi": ""
     }
   }
 }
