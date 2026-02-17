@@ -158,6 +158,44 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+def parola_kontrol_ekrani():
+    app_password = ""
+    try:
+        app_password = st.secrets.get("APP_PASSWORD", "")
+    except:
+        app_password = ""
+    if not app_password:
+        app_password = os.getenv("APP_PASSWORD", "")
+
+    if not app_password:
+        st.error(
+            "Giriş şifresi ayarlı değil. Streamlit Secrets veya APP_PASSWORD env ayarla."
+        )
+        st.stop()
+
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if st.session_state.authenticated:
+        return
+
+    st.title("🔐 Güvenli Giriş")
+    st.caption("Devam etmek için uygulama şifresini gir.")
+    with st.form("login_form", clear_on_submit=False):
+        girilen = st.text_input("Şifre", type="password")
+        giris = st.form_submit_button("Giriş Yap")
+        if giris:
+            if girilen == app_password:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Şifre hatalı.")
+    st.stop()
+
+
+parola_kontrol_ekrani()
+
 # Verileri Yükle
 veriler = veri_yukle(
     "varliklarim.json", {"hisseler": {}, "kripto_paralar": {}, "nakit_ve_emtia": {}}
