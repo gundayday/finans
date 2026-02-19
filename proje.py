@@ -114,23 +114,52 @@ st.set_page_config(page_title="Finans Karargahı", layout="wide")
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&display=swap');
     .stApp {
-        --ui-font-sm: 0.88rem;
+        --ui-font-sm: 0.86rem;
+        --bg-main: #07101c;
+        --bg-panel: #0b1626;
+        --bg-soft: #0f1d31;
+        --line: #22324a;
+        --text-main: #d9e1ec;
+        --text-dim: #94a3b8;
+        --up: #00d084;
+        --down: #ff5f6d;
+        --accent: #02c39a;
+        font-family: 'Public Sans', sans-serif;
+        background: radial-gradient(circle at 15% -10%, #11233b 0%, var(--bg-main) 40%);
+        color: var(--text-main);
+    }
+    [data-testid="stAppViewContainer"] {
+        background: transparent;
+    }
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0a1321 0%, #0b1729 100%);
+        border-right: 1px solid var(--line);
+    }
+    h1, h2, h3, h4 {
+        letter-spacing: 0.2px;
+        font-weight: 700;
+        color: #e6edf7;
     }
     div[data-testid="stMarkdown"] p,
     div[data-testid="stMarkdown"] li,
     div[data-testid="stCaptionContainer"] {
         font-size: var(--ui-font-sm);
+        color: var(--text-dim);
     }
     div[data-testid="stButton"] > button {
         border-radius: 8px;
         min-height: 1.65rem;
         padding: 0 0.45rem;
         font-size: 0.82rem;
+        border: 1px solid #2e4262;
+        background: #102039;
+        color: #dbe6f6;
     }
     div[data-testid="stButton"] > button[aria-label="−"] {
-        color: #c53a3a;
-        border: 1px solid #c53a3a;
+        color: #d85460;
+        border: 1px solid #d85460;
         background: transparent;
         padding: 0 0.28rem;
         min-height: 1.45rem;
@@ -141,17 +170,59 @@ st.markdown(
         background: #e3342f;
         border-color: #e3342f;
     }
+    div[data-testid="stTextInput"] > div,
+    div[data-testid="stNumberInput"] > div,
+    div[data-testid="stSelectbox"] > div {
+        background: var(--bg-soft);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+    }
     div[data-testid="stTextInput"] input,
     div[data-testid="stNumberInput"] input {
         font-size: 0.84rem;
         min-height: 2.05rem;
         padding-top: 0.25rem;
         padding-bottom: 0.25rem;
+        color: #dbe6f6;
     }
     div[data-testid="stTextInput"] label,
     div[data-testid="stNumberInput"] label,
     div[data-testid="stSelectbox"] label {
         font-size: 0.78rem;
+        color: #9fb1cb;
+    }
+    div[data-testid="stMetric"] {
+        background: #0d1a2d;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 10px;
+    }
+    .yf-table-wrap {
+        overflow-x:auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #0a1627;
+    }
+    table.yf-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    table.yf-table th {
+        background: #101f34;
+        color: #c4d0e1;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        padding: 10px 8px;
+        font-weight: 600;
+    }
+    table.yf-table td {
+        border-top: 1px solid #1b2a40;
+        padding: 9px 8px;
+        color: #d9e1ec;
+    }
+    table.yf-table tr:hover td {
+        background: #12233b;
     }
     </style>
     """,
@@ -557,10 +628,10 @@ if sayfa == "Ana Panel":
                     if col == "Değer (TL)":
                         return f"₺{float(val):,.2f}"
                     if col in ["K/Z %", "Değ% (TL)"]:
-                        renk = "red" if float(val) < 0 else ("green" if float(val) > 0 else "#ddd")
+                        renk = "#ff5f6d" if float(val) < 0 else ("#00d084" if float(val) > 0 else "#cbd5e1")
                         return f"<span style='color:{renk}'>{float(val):+.2f}%</span>"
                     if col == "Değ% ($)":
-                        renk = "red" if float(val) < 0 else ("green" if float(val) > 0 else "#ddd")
+                        renk = "#ff5f6d" if float(val) < 0 else ("#00d084" if float(val) > 0 else "#cbd5e1")
                         return (
                             f"<span title=\"{tooltip}\" style='color:{renk}; cursor:help;'>"
                             f"{float(val):+.2f}%</span>"
@@ -574,8 +645,8 @@ if sayfa == "Ana Panel":
 
             thead = "".join([f"<th>{c}</th>" for c in cols])
             table_html = (
-                "<div style='overflow-x:auto'>"
-                "<table style='width:100%; border-collapse:collapse; font-size:0.9rem;'>"
+                "<div class='yf-table-wrap'>"
+                "<table class='yf-table'>"
                 f"<thead><tr>{thead}</tr></thead>"
                 f"<tbody>{''.join(html_rows)}</tbody>"
                 "</table></div>"
