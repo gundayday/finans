@@ -116,7 +116,8 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&display=swap');
     .stApp {
-        --ui-font-sm: 0.86rem;
+        --ui-font-sm: 0.80rem;
+        --ui-scale: 0.92;
         --bg-main: #07101c;
         --bg-panel: #0b1626;
         --bg-soft: #0f1d31;
@@ -129,6 +130,12 @@ st.markdown(
         font-family: 'Public Sans', sans-serif;
         background: radial-gradient(circle at 15% -10%, #11233b 0%, var(--bg-main) 40%);
         color: var(--text-main);
+        font-size: calc(16px * var(--ui-scale));
+    }
+    .main .block-container {
+        max-width: 1260px;
+        padding-top: 1.2rem;
+        padding-bottom: 2rem;
     }
     [data-testid="stAppViewContainer"] {
         background: transparent;
@@ -142,6 +149,9 @@ st.markdown(
         font-weight: 700;
         color: #e6edf7;
     }
+    h1 { font-size: 2.05rem; }
+    h2 { font-size: 1.6rem; }
+    h3 { font-size: 1.25rem; }
     div[data-testid="stMarkdown"] p,
     div[data-testid="stMarkdown"] li,
     div[data-testid="stCaptionContainer"] {
@@ -150,9 +160,9 @@ st.markdown(
     }
     div[data-testid="stButton"] > button {
         border-radius: 8px;
-        min-height: 1.65rem;
-        padding: 0 0.45rem;
-        font-size: 0.82rem;
+        min-height: 1.45rem;
+        padding: 0 0.38rem;
+        font-size: 0.76rem;
         border: 1px solid #2e4262;
         background: #102039;
         color: #dbe6f6;
@@ -179,16 +189,16 @@ st.markdown(
     }
     div[data-testid="stTextInput"] input,
     div[data-testid="stNumberInput"] input {
-        font-size: 0.84rem;
-        min-height: 2.05rem;
-        padding-top: 0.25rem;
-        padding-bottom: 0.25rem;
+        font-size: 0.78rem;
+        min-height: 1.82rem;
+        padding-top: 0.18rem;
+        padding-bottom: 0.18rem;
         color: #dbe6f6;
     }
     div[data-testid="stTextInput"] label,
     div[data-testid="stNumberInput"] label,
     div[data-testid="stSelectbox"] label {
-        font-size: 0.78rem;
+        font-size: 0.72rem;
         color: #9fb1cb;
     }
     div[data-testid="stMetric"] {
@@ -206,19 +216,19 @@ st.markdown(
     table.yf-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.9rem;
+        font-size: 0.82rem;
     }
     table.yf-table th {
         background: #101f34;
         color: #c4d0e1;
         text-align: left;
         border-bottom: 1px solid var(--line);
-        padding: 10px 8px;
+        padding: 7px 7px;
         font-weight: 600;
     }
     table.yf-table td {
         border-top: 1px solid #1b2a40;
-        padding: 9px 8px;
+        padding: 6px 7px;
         color: #d9e1ec;
     }
     table.yf-table tr:hover td {
