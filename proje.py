@@ -6,6 +6,7 @@ import yfinance as yf
 from bs4 import BeautifulSoup
 import os
 import html
+import urllib.parse
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 import plotly.express as px
@@ -225,6 +226,11 @@ st.markdown(
         border-bottom: 1px solid var(--line);
         padding: 7px 7px;
         font-weight: 600;
+    }
+    table.yf-table th:nth-child(2),
+    table.yf-table td:nth-child(2) {
+        width: 98px;
+        text-align: center;
     }
     table.yf-table td {
         border-top: 1px solid #1b2a40;
@@ -459,6 +465,74 @@ def degisim_tooltip_olustur(vid, tip, deg_usd):
     return " ".join(cumleler[:3])
 
 
+def varlik_yf_sembol(vid, tip):
+    if tip == "hisse":
+        return vid.upper()
+    if tip == "kripto":
+        kmap = {
+            "bitcoin": "BTC-USD",
+            "ethereum": "ETH-USD",
+            "solana": "SOL-USD",
+            "ripple": "XRP-USD",
+            "avalanche-2": "AVAX-USD",
+            "optimism": "OP-USD",
+            "arbitrum": "ARB-USD",
+            "zksync": "ZK-USD",
+            "eigenlayer": "EIGEN-USD",
+        }
+        return kmap.get(vid.lower())
+    if tip == "nakit":
+        return {
+            "dolar": "USDTRY=X",
+            "euro": "EURTRY=X",
+            "sterlin": "GBPTRY=X",
+            "gram_altin": "XAUUSD=X",
+        }.get(vid.lower())
+    return None
+
+
+@st.cache_data(ttl=1200, show_spinner=False)
+def mini_sparkline_data(yf_symbol):
+    if not yf_symbol:
+        return []
+    try:
+        hist = yf.Ticker(yf_symbol).history(period="2d", interval="60m")
+        if hist.empty:
+            return []
+        vals = [float(v) for v in hist["Close"].dropna().tolist()]
+        return vals[-24:] if len(vals) > 24 else vals
+    except:
+        return []
+
+
+def sparkline_svg(yf_symbol):
+    vals = mini_sparkline_data(yf_symbol)
+    if len(vals) < 2:
+        return ""
+    w, h = 92, 24
+    vmin, vmax = min(vals), max(vals)
+    rng = (vmax - vmin) if vmax != vmin else 1.0
+    n = len(vals) - 1
+    points = []
+    for i, v in enumerate(vals):
+        x = i * (w / n)
+        y = h - ((v - vmin) / rng) * (h - 2) - 1
+        points.append(f"{x:.2f},{y:.2f}")
+    up = vals[-1] >= vals[0]
+    color = "#00d084" if up else "#ff5f6d"
+    fill = "rgba(0,208,132,0.14)" if up else "rgba(255,95,109,0.14)"
+    polyline = " ".join(points)
+    area = f"0,{h} {polyline} {w},{h}"
+    svg = (
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='{w}' height='{h}' viewBox='0 0 {w} {h}'>"
+        f"<polyline points='{area}' fill='{fill}' stroke='none'/>"
+        f"<polyline points='{polyline}' fill='none' stroke='{color}' stroke-width='1.8'/>"
+        f"<circle cx='{points[-1].split(',')[0]}' cy='{points[-1].split(',')[1]}' r='2.4' fill='{color}'/>"
+        f"</svg>"
+    )
+    return f"data:image/svg+xml;utf8,{urllib.parse.quote(svg)}"
+
+
 def doviz_cek():
     try:
         res = requests.get("https://www.doviz.com/", timeout=5)
@@ -618,6 +692,7 @@ if sayfa == "Ana Panel":
             df = pd.DataFrame(liste)
             cols = [
                 "Varlık",
+                "24s",
                 "Miktar",
                 "Maliyet ($)",
                 "Birim Fiyat ($)",
@@ -631,8 +706,13 @@ if sayfa == "Ana Panel":
             for i, row in df.iterrows():
                 ozet = degisim_tooltip_olustur(kod_liste[i], tip, float(row["Değ% ($)"]))
                 tooltip = html.escape(ozet, quote=True)
+                spark = sparkline_svg(varlik_yf_sembol(kod_liste[i], tip))
 
                 def cfmt(col, val):
+                    if col == "24s":
+                        if spark:
+                            return f"<img src='{spark}' style='width:92px;height:24px;display:block;'/>"
+                        return "<span style='color:#5b6b83'>-</span>"
                     if col in ["Maliyet ($)", "Birim Fiyat ($)", "Değer ($)"]:
                         return f"${float(val):,.2f}"
                     if col == "Değer (TL)":
