@@ -730,7 +730,7 @@ if sayfa == "Ana Panel":
                         return f"{float(val):,.6f}"
                     return str(val)
 
-                tds = "".join([f"<td>{cfmt(c, row[c])}</td>" for c in cols])
+                tds = "".join([f"<td>{cfmt(c, row.get(c, None))}</td>" for c in cols])
                 html_rows.append(f"<tr>{tds}</tr>")
 
             thead = "".join([f"<th>{c}</th>" for c in cols])
