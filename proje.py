@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import json
 import requests
@@ -239,6 +240,80 @@ st.markdown(
     }
     table.yf-table tr:hover td {
         background: #12233b;
+    }
+    .hero-card {
+        position: relative;
+        border: 1px solid #1f2f46;
+        border-radius: 16px;
+        overflow: hidden;
+        background: radial-gradient(circle at 20% 30%, #13253d 0%, #070d16 55%);
+        box-shadow: 0 10px 35px rgba(0,0,0,.35);
+        margin-bottom: 14px;
+    }
+    .hero-inner {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        min-height: 330px;
+    }
+    .hero-left {
+        padding: 34px 30px;
+        position: relative;
+        z-index: 2;
+    }
+    .hero-kicker {
+        color: #8aa0bf;
+        font-size: .78rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+    .hero-title {
+        color: #eaf2ff;
+        font-size: 2.35rem;
+        line-height: 1.05;
+        font-weight: 800;
+        margin: 0 0 14px 0;
+    }
+    .hero-sub {
+        color: #9db1cd;
+        max-width: 560px;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .hero-glow {
+        position: absolute;
+        width: 320px;
+        height: 320px;
+        left: 40%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.02) 65%, transparent 75%);
+        filter: blur(8px);
+        pointer-events: none;
+        z-index: 1;
+    }
+    .hero-right {
+        position: relative;
+        min-height: 330px;
+        background: linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.35));
+    }
+    .hero-right iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+    }
+    @media (max-width: 980px) {
+        .hero-inner {
+            grid-template-columns: 1fr;
+            min-height: 520px;
+        }
+        .hero-right {
+            min-height: 280px;
+        }
+        .hero-title {
+            font-size: 1.8rem;
+        }
     }
     </style>
     """,
@@ -603,6 +678,29 @@ sayfa = st.sidebar.radio(
 # --- ANA PANEL ---
 if sayfa == "Ana Panel":
     st.title("🚀 Varlık Kontrol Paneli")
+    hero_html = """
+    <section class="hero-card">
+      <div class="hero-inner">
+        <div class="hero-left">
+          <div class="hero-kicker">Finans Dashboard</div>
+          <h2 class="hero-title">Interactive 3D</h2>
+          <p class="hero-sub">
+            Portföyünü modern bir arayüzde canlı takip et. Kripto, hisse ve döviz hareketlerini
+            tek bakışta gör, veriye daha hızlı karar ver.
+          </p>
+        </div>
+        <div class="hero-glow"></div>
+        <div class="hero-right">
+          <iframe
+            src="https://my.spline.design/robotfollowcursorforlandingpage-v6SIKPKS4lYafP5g6Y4kQ0Vh/"
+            allowfullscreen
+            loading="lazy"
+          ></iframe>
+        </div>
+      </div>
+    </section>
+    """
+    components.html(hero_html, height=350, scrolling=False)
     kurlar = doviz_cek()
     usd_try = kurlar.get("USD", 35.0)
     k_fiyatlar = kripto_fiyat_cek(veriler["kripto_paralar"])
